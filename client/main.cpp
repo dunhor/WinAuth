@@ -48,6 +48,8 @@ static void set_known_header(HTTP_RESPONSE& response, int knownHeaderId, std::st
 
 static void handle_get_request()
 {
+
+
     // First, figure out what the response was
     auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
     Uri uri{ request.CookedUrl.pFullUrl };
@@ -94,7 +96,12 @@ static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID,
     }
     else if (request.Verb == HttpVerbGET)
     {
-        handle_get_request();
+        // Should ideally validate that this is from a request...
+        auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
+        if (!AuthManager::CompleteRequest(Uri(request.CookedUrl.pFullUrl)))
+        {
+            // TODO: Print
+        }
     }
     else
     {
@@ -171,7 +178,10 @@ int main() try
     AuthRequestParams params(clientId, L"code", Uri(callback_url));
     params.Scope(L"read:user user:email");
 
-    AuthManager::InitiateAuthRequest(Uri(auth_url), params, clientSecret);
+    auto future = AuthManager::InitiateAuthRequest(Uri(auth_url), params, clientSecret);
+    future.Completed([](const AuthResult& response, const AuthFailure& failure) {
+        // TODO
+    });
 }
 catch (winrt::hresult_error& err)
 {

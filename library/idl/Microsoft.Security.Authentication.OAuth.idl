@@ -3,6 +3,8 @@ import "Windows.Foundation.idl";
 
 namespace Microsoft.Security.Authentication.OAuth
 {
+    runtimeclass AuthFuture;
+
     runtimeclass AuthManager
     {
         static AuthFuture InitiateAuthRequest(Windows.Foundation.Uri authEndpoint, AuthRequestParams params);
@@ -11,7 +13,7 @@ namespace Microsoft.Security.Authentication.OAuth
         // Called by the application when the user agent completes an auth request via a redirect Uri. Return value is
         // true if an appropriate request could be found and was completed. Otherwise returns false indicating that the
         // response went unhandled.
-        static bool CompleteRequest(Windows.Foundation.Uri responseUri);
+        static Boolean CompleteRequest(Windows.Foundation.Uri responseUri);
     }
 
     // Correlates to the 'code_challenge_method' as described by section 4.3 of RFC 7636: Proof Key for Code Exchange by
