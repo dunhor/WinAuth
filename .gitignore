@@ -1,0 +1,7 @@
+
+# Build output
+build/
+
+# Editor info
+.vscode/
+.vs/
