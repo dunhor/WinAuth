@@ -3,6 +3,17 @@ import "Windows.Foundation.idl";
 
 namespace Microsoft.Security.Authentication.OAuth
 {
+    runtimeclass AuthManager
+    {
+        static AuthFuture InitiateAuthRequest(Windows.Foundation.Uri authEndpoint, AuthRequestParams params);
+        static AuthFuture InitiateAuthRequest(Windows.Foundation.Uri authEndpoint, AuthRequestParams params, String clientSecret);
+
+        // Called by the application when the user agent completes an auth request via a redirect Uri. Return value is
+        // true if an appropriate request could be found and was completed. Otherwise returns false indicating that the
+        // response went unhandled.
+        static bool CompleteRequest(Windows.Foundation.Uri responseUri);
+    }
+
     // Correlates to the 'code_challenge_method' as described by section 4.3 of RFC 7636: Proof Key for Code Exchange by
     // OAuth Public Clients (https://www.rfc-editor.org/rfc/rfc7636.html#section-4.3)
     enum CodeChallengeMethodKind
@@ -47,5 +58,46 @@ namespace Microsoft.Security.Authentication.OAuth
 
         // Additional parameters passed along with the request
         Windows.Foundation.Collections.IMap<String, String> AdditionalParams;
+    }
+
+    // Only one will be non-null
+    delegate void AuthCompletedHandler(AuthResult result, AuthFailure failure);
+
+    runtimeclass AuthFuture
+    {
+        void Cancel();
+        void SetTimeout(Windows.Foundation.TimeSpan duration);
+        AuthCompletedHandler Completed { get; set; };
+    }
+
+    enum AuthFailureReason
+    {
+        // Server responded with failure (bad params, user cancelled, etc.)
+        Server = 0,
+        // Request was cancelled by the application
+        Cancelled = 1,
+        // The requested timeout has elapsed without a response from the server
+        Timeout = 2,
+    };
+
+    runtimeclass AuthFailure
+    {
+        AuthFailureReason Reason { get; };
+
+        // TODO: More info depending on the nature of the failure
+    }
+
+    runtimeclass AuthResult
+    {
+        Windows.Foundation.Uri ResponseUri { get; };
+
+        String TokenType { get; };
+        String Code { get; };
+        String AccessToken { get; };
+        String State { get; };
+        String ExpiresIn { get; }; // TODO: DateTime?
+        // String IdToken { get; };
+        String Scope { get; };
+        Windows.Foundation.Collections.IMap<String, String> AdditionalParams { get; };
     }
 }

@@ -4,7 +4,6 @@ project(WinAuth)
 string(REGEX REPLACE "\\\\$" "" WinSdkVersion "$ENV{WindowsSDKVersion}")
 
 set(WinSdkMetadataDir "$ENV{WindowsSdkDir}UnionMetadata\\${WinSdkVersion}")
-set(WinSdkRefDir "$ENV{WindowsSdkDir}References\\${WinSdkVersion}")
 
 # Download the cppwinrt nuget
 if (NOT DEFINED CPPWINRT_VERSION)
@@ -26,6 +25,7 @@ endif()
 
 set(CPPWINRT ${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.CppWinRT.${CPPWINRT_VERSION}/bin/cppwinrt.exe)
 
+add_subdirectory(client)
 add_subdirectory(library)
 
 # Custom target for running clang-format

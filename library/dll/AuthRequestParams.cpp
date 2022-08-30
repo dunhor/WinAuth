@@ -3,98 +3,118 @@
 #include "AuthRequestParams.h"
 #include <AuthRequestParams.g.cpp>
 
+using namespace winrt::Microsoft::Security::Authentication::OAuth;
+using namespace winrt::Windows::Foundation;
+using namespace winrt::Windows::Foundation::Collections;
+
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    AuthRequestParams::AuthRequestParams(hstring const& clientId, hstring const& responseType)
+    AuthRequestParams::AuthRequestParams(const winrt::hstring& clientId, const winrt::hstring& responseType) :
+        m_clientId(clientId),
+        m_responseType(responseType)
     {
-        throw hresult_not_implemented();
     }
 
-    AuthRequestParams::AuthRequestParams(hstring const& clientId, hstring const& responseType,
-        winrt::Windows::Foundation::Uri const& redirectUri)
+    AuthRequestParams::AuthRequestParams(const winrt::hstring& clientId, const winrt::hstring& responseType,
+        const Uri& redirectUri) :
+        m_clientId(clientId),
+        m_responseType(responseType),
+        m_redirectUri(redirectUri)
     {
-        throw hresult_not_implemented();
     }
 
-    hstring AuthRequestParams::ResponseType()
+    winrt::hstring AuthRequestParams::ResponseType()
     {
-        return m_responseType;
+        return read_op([&]() { return m_responseType; });
     }
 
-    void AuthRequestParams::ResponseType(hstring const& value)
+    void AuthRequestParams::ResponseType(const winrt::hstring& value)
     {
-        m_responseType = value;
+        modify_op([&]() { m_responseType = value; });
     }
 
-    hstring AuthRequestParams::ClientId()
+    winrt::hstring AuthRequestParams::ClientId()
     {
-        return m_clientId;
+        return read_op([&]() { return m_clientId; });
     }
 
-    void AuthRequestParams::ClientId(hstring const& value)
+    void AuthRequestParams::ClientId(const winrt::hstring& value)
     {
-        m_clientId = value;
+        modify_op([&]() { m_clientId = value; });
     }
 
-    winrt::Windows::Foundation::Uri AuthRequestParams::RedirectUri()
+    Uri AuthRequestParams::RedirectUri()
     {
-        return m_redirectUri;
+        return read_op([&]() { return m_redirectUri; });
     }
 
-    void AuthRequestParams::RedirectUri(winrt::Windows::Foundation::Uri const& value)
+    void AuthRequestParams::RedirectUri(const Uri& value)
     {
-        m_redirectUri = value;
+        modify_op([&]() { m_redirectUri = value; });
     }
 
-    hstring AuthRequestParams::Scope()
+    winrt::hstring AuthRequestParams::Scope()
     {
-        return m_scope;
+        return read_op([&]() { return m_scope; });
     }
 
-    void AuthRequestParams::Scope(hstring const& value)
+    void AuthRequestParams::Scope(const winrt::hstring& value)
     {
-        m_scope = value;
+        modify_op([&]() { m_scope = value; });
     }
 
-    hstring AuthRequestParams::State()
+    winrt::hstring AuthRequestParams::State()
     {
-        return m_state;
+        return read_op([&]() { return m_state; });
     }
 
-    void AuthRequestParams::State(hstring const& value)
+    void AuthRequestParams::State(const winrt::hstring& value)
     {
-        m_state = value;
+        modify_op([&]() { m_state = value; });
     }
 
-    hstring AuthRequestParams::CodeChallenge()
+    winrt::hstring AuthRequestParams::CodeChallenge()
     {
-        return m_codeChallenge;
+        return read_op([&]() { return m_codeChallenge; });
     }
 
-    void AuthRequestParams::CodeChallenge(hstring const& value)
+    void AuthRequestParams::CodeChallenge(const winrt::hstring& value)
     {
-        m_codeChallenge = value;
+        modify_op([&]() { m_codeChallenge = value; });
     }
 
-    winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind AuthRequestParams::CodeChallengeMethod()
+    CodeChallengeMethodKind AuthRequestParams::CodeChallengeMethod()
     {
-        return m_codeChallengeMethod;
+        return read_op([&]() { return m_codeChallengeMethod; });
     }
 
-    void AuthRequestParams::CodeChallengeMethod(
-        winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind const& value)
+    void AuthRequestParams::CodeChallengeMethod(CodeChallengeMethodKind value)
     {
-        m_codeChallengeMethod = value;
+        modify_op([&]() { m_codeChallengeMethod = value; });
     }
 
-    winrt::Windows::Foundation::Collections::IMap<hstring, hstring> AuthRequestParams::AdditionalParams()
+    IMap<winrt::hstring, winrt::hstring> AuthRequestParams::AdditionalParams()
     {
-        return m_additionalParams;
+        return read_op([&]() { return m_additionalParams; });
     }
 
-    void AuthRequestParams::AdditionalParams(
-        winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value)
+    void AuthRequestParams::AdditionalParams(IMap<winrt::hstring, winrt::hstring> const& value)
     {
-        m_additionalParams = value;
+        modify_op([&]() { m_additionalParams = value; });
+    }
+
+    void AuthRequestParams::Finalize()
+    {
+        std::uint8_t expected = 0;
+        if (!m_guard.compare_exchange_strong(expected, 2))
+        {
+            // State 1 is modification; state 2 is the final state
+            if (expected == 1)
+            {
+                throw winrt::hresult_changed_state(L"Concurrent modification of AuthRequestParams is not allowed");
+            }
+
+            throw winrt::hresult_illegal_method_call(L"AuthRequestParams can only be used for a single auth request");
+        }
     }
 }

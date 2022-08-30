@@ -5,7 +5,7 @@ setlocal EnableDelayedExpansion
 set THIS_DIR=%~dp0
 set ROOT_DIR=%THIS_DIR%\..
 
-set DIRS=library
+set DIRS=client library
 set EXTS=.cpp .h
 
 for %%d in (%DIRS%) do call :recursive_format %ROOT_DIR%\%%d
