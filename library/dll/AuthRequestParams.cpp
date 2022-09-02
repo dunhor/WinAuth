@@ -1,11 +1,14 @@
 #include "pch.h"
 
+#include "AuthManager.h"
 #include "AuthRequestParams.h"
 #include <AuthRequestParams.g.cpp>
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
+using namespace winrt::Windows::Security::Cryptography;
+using namespace winrt::Windows::Security::Cryptography::Core;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
@@ -25,96 +28,203 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 
     winrt::hstring AuthRequestParams::ResponseType()
     {
-        return read_op([&]() { return m_responseType; });
+        std::shared_lock guard{ m_mutex };
+        return m_responseType;
     }
 
     void AuthRequestParams::ResponseType(const winrt::hstring& value)
     {
-        modify_op([&]() { m_responseType = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_responseType = value;
     }
 
     winrt::hstring AuthRequestParams::ClientId()
     {
-        return read_op([&]() { return m_clientId; });
+        std::shared_lock guard{ m_mutex };
+        return m_clientId;
     }
 
     void AuthRequestParams::ClientId(const winrt::hstring& value)
     {
-        modify_op([&]() { m_clientId = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_clientId = value;
     }
 
     Uri AuthRequestParams::RedirectUri()
     {
-        return read_op([&]() { return m_redirectUri; });
+        std::shared_lock guard{ m_mutex };
+        return m_redirectUri;
     }
 
     void AuthRequestParams::RedirectUri(const Uri& value)
     {
-        modify_op([&]() { m_redirectUri = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_redirectUri = value;
     }
 
     winrt::hstring AuthRequestParams::Scope()
     {
-        return read_op([&]() { return m_scope; });
+        std::shared_lock guard{ m_mutex };
+        return m_scope;
     }
 
     void AuthRequestParams::Scope(const winrt::hstring& value)
     {
-        modify_op([&]() { m_scope = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_scope = value;
     }
 
     winrt::hstring AuthRequestParams::State()
     {
-        return read_op([&]() { return m_state; });
+        std::shared_lock guard{ m_mutex };
+        return m_state;
     }
 
     void AuthRequestParams::State(const winrt::hstring& value)
     {
-        modify_op([&]() { m_state = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_state = value;
     }
 
-    winrt::hstring AuthRequestParams::CodeChallenge()
+    winrt::hstring AuthRequestParams::CodeVerifier()
     {
-        return read_op([&]() { return m_codeChallenge; });
+        std::shared_lock guard{ m_mutex };
+        return m_codeVerifier;
     }
 
-    void AuthRequestParams::CodeChallenge(const winrt::hstring& value)
+    void AuthRequestParams::CodeVerifier(const winrt::hstring& value)
     {
-        modify_op([&]() { m_codeChallenge = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_codeVerifier = value;
     }
 
     CodeChallengeMethodKind AuthRequestParams::CodeChallengeMethod()
     {
-        return read_op([&]() { return m_codeChallengeMethod; });
+        std::shared_lock guard{ m_mutex };
+        return m_codeChallengeMethod;
     }
 
     void AuthRequestParams::CodeChallengeMethod(CodeChallengeMethodKind value)
     {
-        modify_op([&]() { m_codeChallengeMethod = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_codeChallengeMethod = value;
     }
 
     IMap<winrt::hstring, winrt::hstring> AuthRequestParams::AdditionalParams()
     {
-        return read_op([&]() { return m_additionalParams; });
+        std::shared_lock guard{ m_mutex };
+        return m_additionalParams;
     }
 
     void AuthRequestParams::AdditionalParams(IMap<winrt::hstring, winrt::hstring> const& value)
     {
-        modify_op([&]() { m_additionalParams = value; });
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_additionalParams = value;
     }
 
-    void AuthRequestParams::Finalize()
+    void AuthRequestParams::finalize()
     {
-        std::uint8_t expected = 0;
-        if (!m_guard.compare_exchange_strong(expected, 2))
+        std::lock_guard guard{ m_mutex };
+        if (m_finalized)
         {
-            // State 1 is modification; state 2 is the final state
-            if (expected == 1)
-            {
-                throw winrt::hresult_changed_state(L"Concurrent modification of AuthRequestParams is not allowed");
-            }
-
-            throw winrt::hresult_illegal_method_call(L"AuthRequestParams can only be used for a single auth request");
+            throw winrt::hresult_illegal_method_call(L"AuthRequestParams can only be used for a single request call");
         }
+
+        m_finalized = true;
+
+        if (!m_codeVerifier.empty() && (m_codeChallengeMethod == CodeChallengeMethodKind::None))
+        {
+            throw winrt::hresult_illegal_method_call(L"'CodeChallenge' cannot be set when 'CodeChallengeMethod' is set to 'None'");
+        }
+
+        if (m_state.empty())
+        {
+            m_state = winrt::make_self<factory_implementation::AuthManager>()->generate_unique_state();
+        }
+
+        if (m_codeVerifier.empty() && (m_codeChallengeMethod != CodeChallengeMethodKind::None))
+        {
+            // TODO: Set m_codeVerifier
+        }
+    }
+
+    std::wstring AuthRequestParams::query_string()
+    {
+        std::shared_lock guard{ m_mutex };
+
+        std::wstring result = L"?state=";
+        result += Uri::EscapeComponent(m_state);
+
+        if (!m_responseType.empty())
+        {
+            result += L"&response_type=";
+            result += Uri::EscapeComponent(m_responseType);
+        }
+
+        if (!m_clientId.empty())
+        {
+            result += L"&client_id=";
+            result += Uri::EscapeComponent(m_clientId);
+        }
+
+        if (m_redirectUri)
+        {
+            result += L"&redirect_uri=";
+            result += Uri::EscapeComponent(m_redirectUri.RawUri());
+        }
+
+        if (!m_scope.empty())
+        {
+            result += L"&scope=";
+            result += Uri::EscapeComponent(m_scope);
+        }
+
+        if (m_codeChallengeMethod == CodeChallengeMethodKind::S256)
+        {
+            result += L"&code_challenge_method=S256&code_challenge=";
+
+            auto sha256 = HashAlgorithmProvider::OpenAlgorithm(HashAlgorithmNames::Sha256());
+            auto buffer = CryptographicBuffer::ConvertStringToBinary(m_codeVerifier, BinaryStringEncoding::Utf8);
+            auto encodedHash = CryptographicBuffer::EncodeToBase64String(sha256.HashData(buffer));
+            // NOTE: WinRT doesn't have a 'Base64UrlEncode' function, so we need to manually convert
+            for (auto ch : encodedHash)
+            {
+                if (ch == '+')
+                {
+                    result.push_back('-');
+                }
+                else if (ch == '/')
+                {
+                    result.push_back('_');
+                }
+                else if (ch != '=')
+                {
+                    result.push_back(ch);
+                }
+            }
+        }
+        else if (m_codeChallengeMethod == CodeChallengeMethodKind::Plain)
+        {
+            result += L"&code_challenge_method=plain&code_challenge=";
+            result += Uri::EscapeComponent(m_codeVerifier);
+        }
+
+        for (auto&& pair : m_additionalParams)
+        {
+            result += L"&";
+            result += Uri::EscapeComponent(pair.Key());
+            result += L"=";
+            result += Uri::EscapeComponent(pair.Value());
+        }
+
+        return result;
     }
 }

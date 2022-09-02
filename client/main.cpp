@@ -9,6 +9,7 @@
 #include <http.h>
 
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
+#include <winrt/Windows.Foundation.h>
 
 #pragma comment(lib, "httpapi.lib")
 #pragma comment(lib, "shell32.lib")
@@ -18,7 +19,8 @@ using namespace winrt::Microsoft::Security::Authentication::OAuth;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
 
-#define THROW_IF_WIN32_ERROR(err) if (err != NO_ERROR) winrt::check_hresult(HRESULT_FROM_WIN32(err))
+#define THROW_IF_WIN32_ERROR(err)                                                                                      \
+    if (err != NO_ERROR) winrt::check_hresult(HRESULT_FROM_WIN32(err))
 
 // Global server data
 static HTTP_SERVER_SESSION_ID session_id = 0;
@@ -46,46 +48,14 @@ static void set_known_header(HTTP_RESPONSE& response, int knownHeaderId, std::st
     header.RawValueLength = static_cast<USHORT>(str.size());
 }
 
-static void handle_get_request()
-{
-
-
-    // First, figure out what the response was
-    auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
-    Uri uri{ request.CookedUrl.pFullUrl };
-    // For demo purposes, the path should always be '/'
-    auto queryParams = uri.QueryParsed();
-    (void)queryParams;
-
-    HTTP_RESPONSE response{};
-    response.StatusCode = 200;
-    response.pReason = "OK";
-    response.ReasonLength = 2;
-
-    set_known_header(response, HttpHeaderContentType, "text/html"sv);
-
-    HTTP_DATA_CHUNK dataChunk{};
-    dataChunk.DataChunkType = HttpDataChunkFromMemory;
-    dataChunk.FromMemory.pBuffer = const_cast<char*>(response_html.data());
-    dataChunk.FromMemory.BufferLength = static_cast<ULONG>(response_html.size());
-
-    response.EntityChunkCount = 1;
-    response.pEntityChunks = &dataChunk;
-
-    ::StartThreadpoolIo(threadpool_io);
-
-    [[maybe_unused]] auto err = ::HttpSendHttpResponse(request_queue, request.RequestId, 0, &response,
-        nullptr, nullptr, nullptr, 0, nullptr, nullptr);
-    assert(err == NO_ERROR);
-}
-
 // NOTE: This should probably be synchronized better, but for proof of concept it's fine
-static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID, PVOID, ULONG ioResult, ULONG_PTR, PTP_IO)
+static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID, PVOID, ULONG ioResult, ULONG_PTR,
+    PTP_IO)
 {
     auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
     if (ioResult == ERROR_MORE_DATA)
     {
-        // TODO: this will never git hit for the demo
+        // TODO: This should never happen in practice for this example
         assert(false);
         return;
     }
@@ -98,17 +68,41 @@ static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID,
     {
         // Should ideally validate that this is from a request...
         auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
-        if (!AuthManager::CompleteRequest(Uri(request.CookedUrl.pFullUrl)))
+        if (!AuthManager::CompleteAuthRequest(Uri(request.CookedUrl.pFullUrl)))
         {
-            // TODO: Print
+            std::printf("Unable to complete request for uri %ls\n", request.CookedUrl.pFullUrl);
+            // TODO: Ideally would send a response back to the user agent, however this shouldn't really happen in
+            // practice for this example, so we'll skip it for now
+            return;
         }
+
+        HTTP_RESPONSE response = {};
+        response.StatusCode = 200;
+        response.pReason = "OK";
+        response.ReasonLength = 2;
+
+        set_known_header(response, HttpHeaderContentType, "text/html"sv);
+
+        HTTP_DATA_CHUNK dataChunk = {};
+        dataChunk.DataChunkType = HttpDataChunkFromMemory;
+        dataChunk.FromMemory.pBuffer = const_cast<char*>(response_html.data());
+        dataChunk.FromMemory.BufferLength = static_cast<ULONG>(response_html.size());
+
+        response.EntityChunkCount = 1;
+        response.pEntityChunks = &dataChunk;
+
+        [[maybe_unused]] auto err = ::HttpSendHttpResponse(request_queue, request.RequestId, 0, &response, nullptr,
+            nullptr, nullptr, 0, nullptr, nullptr);
+        assert(err == NO_ERROR);
     }
     else
     {
-        // TODO?
+        // TODO: This should never happen in practice for this example
     }
 
-
+    // TODO: Would ideally start listening for more requests, however that's not entirely necessary for this example
+    // since all we need is the result
+    // ::StartThreadpoolIo(threadpool_io); // TODO: Is this right?
 }
 
 void start_server()
@@ -164,7 +158,8 @@ void start_server()
     }
 }
 
-int main() try
+int main()
+try
 {
     start_server();
     std::printf("Server started at: %ls\n", callback_url.c_str());
@@ -178,10 +173,56 @@ int main() try
     AuthRequestParams params(clientId, L"code", Uri(callback_url));
     params.Scope(L"read:user user:email");
 
-    auto future = AuthManager::InitiateAuthRequest(Uri(auth_url), params, clientSecret);
-    future.Completed([](const AuthResult& response, const AuthFailure& failure) {
-        // TODO
+    auto event = ::CreateEventW(nullptr, true, false, nullptr);
+
+    auto op = AuthManager::InitiateAuthRequestAsync(Uri(auth_url), params, clientSecret);
+    op.Completed([&](const IAsyncOperation<AuthRequestResult>& result, AsyncStatus status) {
+        switch (status)
+        {
+        case AsyncStatus::Completed: {
+            auto requestResult = result.GetResults();
+            if (auto response = requestResult.Response())
+            {
+                std::printf("Authorization code: %ls\n", response.Code().c_str());
+            }
+            else
+            {
+                // TODO auto failure = requestResult.Failure();
+                std::printf("Received a failure response from the server\n");
+            }
+        }
+        break;
+
+        case AsyncStatus::Canceled: std::printf("Request cancelled by caller\n"); break;
+
+        case AsyncStatus::Error: std::printf("Request completed with error 0x%08X\n", result.ErrorCode().value); break;
+
+        case AsyncStatus::Started:
+        default: std::printf("Unexpected async completion\n"); break;
+        }
+
+        ::SetEvent(event);
     });
+
+    auto waitResult = ::WaitForSingleObject(event, 60000);
+    switch (waitResult)
+    {
+    case WAIT_OBJECT_0:
+        // Success; nothing to do
+        break;
+
+    case WAIT_TIMEOUT:
+        std::printf("Operation took longer than one minute; cancelling\n");
+        op.Cancel();
+        ::WaitForSingleObject(event, INFINITY);
+        return ERROR_TIMEOUT;
+
+    default:
+        std::printf("ERROR: Failure waiting for request to complete (%lu)\n", ::GetLastError());
+        return ::GetLastError();
+    }
+
+    return 0;
 }
 catch (winrt::hresult_error& err)
 {
@@ -193,4 +234,5 @@ catch (std::exception& err)
 {
     std::printf("ERROR: Unhandled exception\n");
     std::printf("ERROR: %s\n", err.what());
+    return ERROR_UNHANDLED_EXCEPTION;
 }

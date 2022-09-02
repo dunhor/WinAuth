@@ -22,74 +22,35 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         void Scope(const winrt::hstring& value);
         winrt::hstring State();
         void State(const winrt::hstring& value);
-        winrt::hstring CodeChallenge();
-        void CodeChallenge(const winrt::hstring& value);
+        winrt::hstring CodeVerifier();
+        void CodeVerifier(const winrt::hstring& value);
         winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind CodeChallengeMethod();
         void CodeChallengeMethod(winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind value);
         winrt::Windows::Foundation::Collections::IMap<hstring, winrt::hstring> AdditionalParams();
         void AdditionalParams(const winrt::Windows::Foundation::Collections::IMap<hstring, winrt::hstring>& value);
 
         // Implementation functions
-        void Finalize();
+        void finalize();
+        std::wstring query_string();
 
     private:
-        struct revert_guard_on_exit
+        void check_not_finalized()
         {
-            AuthRequestParams* target;
-
-            ~revert_guard_on_exit()
+            // NOTE: Lock should be held when calling
+            if (m_finalized)
             {
-                target->m_guard.store(0);
+                throw winrt::hresult_illegal_method_call(L"AuthRequestParams object cannot be modified after being used to initiate a request");
             }
-        };
-
-        template <typename Func>
-        auto modify_op(Func&& callback)
-        {
-            std::uint8_t expect = 0;
-            if (!m_guard.compare_exchange_strong(expect, 1))
-            {
-                if (expect == 1)
-                {
-                    throw winrt::hresult_changed_state(L"Concurrent modification of AuthRequestParams is not allowed");
-                }
-                else
-                {
-                    throw winrt::hresult_illegal_method_call(
-                        L"Cannot modify AuthRequestParams object after it has been used to initiate an auth request");
-                }
-            }
-
-            revert_guard_on_exit guard{ this };
-            return callback();
         }
 
-        template <typename Func>
-        auto read_op(Func&& callback)
-        {
-            std::uint8_t expect = 0;
-            if (!m_guard.compare_exchange_strong(expect, 1))
-            {
-                if (expect == 1)
-                {
-                    throw winrt::hresult_changed_state(L"Concurrent access of AuthRequestParams is not allowed");
-                }
-
-                // Otherwise the params are finalized, just make the callback and we're done
-                return callback();
-            }
-
-            revert_guard_on_exit guard{ this };
-            return callback();
-        }
-
-        std::atomic_uint8_t m_guard{ 0 };
-        winrt::hstring m_responseType;
+        std::shared_mutex m_mutex;
+        bool m_finalized = false;
+        winrt::hstring m_responseType = L"code";
         winrt::hstring m_clientId;
         winrt::Windows::Foundation::Uri m_redirectUri{ nullptr };
         winrt::hstring m_scope;
         winrt::hstring m_state;
-        winrt::hstring m_codeChallenge;
+        winrt::hstring m_codeVerifier;
         winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind m_codeChallengeMethod =
             winrt::Microsoft::Security::Authentication::OAuth::CodeChallengeMethodKind::S256;
         winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::hstring> m_additionalParams =
