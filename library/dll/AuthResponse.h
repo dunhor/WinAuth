@@ -5,13 +5,24 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct AuthResponse : AuthResponseT<AuthResponse>
     {
-        winrt::Windows::Foundation::Uri ResponseUri();
-        winrt::hstring TokenType();
+        AuthResponse(const foundation::Uri& responseUri);
+
+        winrt::hstring State();
         winrt::hstring Code();
         winrt::hstring AccessToken();
-        winrt::hstring State();
+        winrt::hstring TokenType();
         winrt::hstring ExpiresIn();
         winrt::hstring Scope();
-        winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::hstring> AdditionalParams();
+        collections::IMapView<winrt::hstring, winrt::hstring> AdditionalParams();
+
+    private:
+
+        winrt::hstring m_state;
+        winrt::hstring m_code;
+        winrt::hstring m_accessToken;
+        winrt::hstring m_tokenType;
+        winrt::hstring m_expiresIn;
+        winrt::hstring m_scope;
+        collections::IMapView<winrt::hstring, winrt::hstring> m_additionalParams;
     };
 }

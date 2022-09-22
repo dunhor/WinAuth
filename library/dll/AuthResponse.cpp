@@ -3,49 +3,87 @@
 #include "AuthResponse.h"
 #include <AuthResponse.g.cpp>
 
+using namespace std::literals;
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    Uri AuthResponse::ResponseUri()
+    AuthResponse::AuthResponse(const Uri& responseUri)
     {
-        throw hresult_not_implemented(); // TODO
-    }
+        std::map<winrt::hstring, winrt::hstring> additionalParams;
 
-    winrt::hstring AuthResponse::TokenType()
-    {
-        throw hresult_not_implemented(); // TODO
-    }
+        for (auto&& entry : responseUri.QueryParsed())
+        {
+            auto name = entry.Name();
+            if (name == L"state"sv)
+            {
+                m_state = entry.Value();
+            }
+            else if (name == L"code"sv)
+            {
+                m_code = entry.Value();
+            }
+            else if (name == L"access_token"sv)
+            {
+                m_accessToken = entry.Value();
+            }
+            else if (name == L"token_type"sv)
+            {
+                m_tokenType = entry.Value();
+            }
+            else if (name == L"expires_in"sv)
+            {
+                m_expiresIn = entry.Value();
+            }
+            else if (name == L"scope"sv)
+            {
+                m_scope = entry.Value();
+            }
+            else
+            {
+                additionalParams.emplace(std::move(name), entry.Value());
+            }
+        }
 
-    winrt::hstring AuthResponse::Code()
-    {
-        throw hresult_not_implemented(); // TODO
-    }
+        // TODO: Look in the fragment part as well
 
-    winrt::hstring AuthResponse::AccessToken()
-    {
-        throw hresult_not_implemented(); // TODO
+        m_additionalParams = winrt::single_threaded_map(std::move(additionalParams)).GetView();
     }
 
     winrt::hstring AuthResponse::State()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_state;
+    }
+
+    winrt::hstring AuthResponse::Code()
+    {
+        return m_code;
+    }
+
+    winrt::hstring AuthResponse::AccessToken()
+    {
+        return m_accessToken;
+    }
+
+    winrt::hstring AuthResponse::TokenType()
+    {
+        return m_tokenType;
     }
 
     winrt::hstring AuthResponse::ExpiresIn()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_expiresIn;
     }
 
     winrt::hstring AuthResponse::Scope()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_scope;
     }
 
-    IMap<winrt::hstring, winrt::hstring> AuthResponse::AdditionalParams()
+    IMapView<winrt::hstring, winrt::hstring> AuthResponse::AdditionalParams()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_additionalParams;
     }
 }

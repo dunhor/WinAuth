@@ -5,7 +5,14 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct AuthRequestResult : AuthRequestResultT<AuthRequestResult>
     {
-        winrt::Microsoft::Security::Authentication::OAuth::AuthResponse Response();
-        winrt::Microsoft::Security::Authentication::OAuth::AuthFailure Failure();
+        foundation::Uri ResponseUri();
+        oauth::AuthResponse Response();
+        oauth::AuthFailure Failure();
+
+    private:
+
+        foundation::Uri m_responseUri;
+        oauth::AuthResponse m_response{ nullptr };
+        oauth::AuthFailure m_failure{ nullptr };
     };
 }

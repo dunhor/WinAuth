@@ -12,18 +12,44 @@ using namespace winrt::Windows::Security::Cryptography::Core;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    AuthRequestParams::AuthRequestParams(const winrt::hstring& clientId, const winrt::hstring& responseType) :
-        m_clientId(clientId),
-        m_responseType(responseType)
+    oauth::AuthRequestParams AuthRequestParams::CreateForAuthorizationCodeRequest(const winrt::hstring& clientId)
     {
+        auto result = winrt::make_self<AuthRequestParams>();
+        result->m_responseType = L"code";
+        result->m_clientId = clientId;
+
+        return *result;
     }
 
-    AuthRequestParams::AuthRequestParams(const winrt::hstring& clientId, const winrt::hstring& responseType,
-        const Uri& redirectUri) :
-        m_clientId(clientId),
-        m_responseType(responseType),
-        m_redirectUri(redirectUri)
+    oauth::AuthRequestParams AuthRequestParams::CreateForAuthorizationCodeRequest(const winrt::hstring& clientId,
+        const Uri& redirectUri)
     {
+        auto result = winrt::make_self<AuthRequestParams>();
+        result->m_responseType = L"code";
+        result->m_clientId = clientId;
+        result->m_redirectUri = redirectUri;
+
+        return *result;
+    }
+
+    oauth::AuthRequestParams AuthRequestParams::CreateForImplicitRequest(const winrt::hstring& clientId)
+    {
+        auto result = winrt::make_self<AuthRequestParams>();
+        result->m_responseType = L"token";
+        result->m_clientId = clientId;
+
+        return *result;
+    }
+
+    oauth::AuthRequestParams AuthRequestParams::CreateForImplicitRequest(const winrt::hstring& clientId,
+        const Uri& redirectUri)
+    {
+        auto result = winrt::make_self<AuthRequestParams>();
+        result->m_responseType = L"token";
+        result->m_clientId = clientId;
+        result->m_redirectUri = redirectUri;
+
+        return *result;
     }
 
     winrt::hstring AuthRequestParams::ResponseType()
@@ -65,19 +91,6 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         m_redirectUri = value;
     }
 
-    winrt::hstring AuthRequestParams::Scope()
-    {
-        std::shared_lock guard{ m_mutex };
-        return m_scope;
-    }
-
-    void AuthRequestParams::Scope(const winrt::hstring& value)
-    {
-        std::lock_guard guard{ m_mutex };
-        check_not_finalized();
-        m_scope = value;
-    }
-
     winrt::hstring AuthRequestParams::State()
     {
         std::shared_lock guard{ m_mutex };
@@ -89,6 +102,19 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         std::lock_guard guard{ m_mutex };
         check_not_finalized();
         m_state = value;
+    }
+
+    winrt::hstring AuthRequestParams::Scope()
+    {
+        std::shared_lock guard{ m_mutex };
+        return m_scope;
+    }
+
+    void AuthRequestParams::Scope(const winrt::hstring& value)
+    {
+        std::lock_guard guard{ m_mutex };
+        check_not_finalized();
+        m_scope = value;
     }
 
     winrt::hstring AuthRequestParams::CodeVerifier()
@@ -123,7 +149,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         return m_additionalParams;
     }
 
-    void AuthRequestParams::AdditionalParams(IMap<winrt::hstring, winrt::hstring> const& value)
+    void AuthRequestParams::AdditionalParams(const IMap<winrt::hstring, winrt::hstring>& value)
     {
         std::lock_guard guard{ m_mutex };
         check_not_finalized();
@@ -142,7 +168,8 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 
         if (!m_codeVerifier.empty() && (m_codeChallengeMethod == CodeChallengeMethodKind::None))
         {
-            throw winrt::hresult_illegal_method_call(L"'CodeChallenge' cannot be set when 'CodeChallengeMethod' is set to 'None'");
+            throw winrt::hresult_illegal_method_call(
+                L"'CodeChallenge' cannot be set when 'CodeChallengeMethod' is set to 'None'");
         }
 
         if (m_state.empty())

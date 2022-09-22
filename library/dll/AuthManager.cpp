@@ -13,15 +13,11 @@ using namespace winrt::Windows::System;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementation
 {
-    IAsyncOperation<AuthRequestResult> AuthManager::InitiateAuthRequestAsync(const Uri& authEndpoint,
-        const OAuth::AuthRequestParams& params)
+    IAsyncOperation<AuthRequestResult> AuthManager::InitiateAuthRequestAsync(Uri authEndpoint,
+        oauth::AuthRequestParams params)
     {
-        return InitiateAuthRequestAsync(authEndpoint, params, winrt::hstring{});
-    }
-
-    IAsyncOperation<AuthRequestResult> AuthManager::InitiateAuthRequestAsync(const Uri& authEndpoint,
-        const OAuth::AuthRequestParams& params, const winrt::hstring& clientSecret)
-    {
+        throw winrt::hresult_not_implemented();
+        /* TODO
         winrt::com_ptr<AuthRequestAsyncOperation> result{ nullptr };
         auto paramsImpl = winrt::get_self<implementation::AuthRequestParams>(params);
 
@@ -54,11 +50,18 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         }
 
         return *result;
+        */
     }
 
     bool AuthManager::CompleteAuthRequest(const Uri& responseUri)
     {
         throw hresult_not_implemented(); // TODO
+    }
+
+    IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
+        oauth::TokenRequestParams params)
+    {
+        throw winrt::hresult_not_implemented(); // TODO
     }
 
     std::wstring AuthManager::generate_unique_state()

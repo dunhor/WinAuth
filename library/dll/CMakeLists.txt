@@ -36,13 +36,17 @@ target_include_directories(${API_NAME} PRIVATE
 target_precompile_headers(${API_NAME} PRIVATE pch.h)
 
 target_sources(${API_NAME} PRIVATE
+    module.cpp
     AuthFailure.cpp
     AuthManager.cpp
     AuthRequestAsyncOperation.cpp
     AuthRequestParams.cpp
     AuthRequestResult.cpp
     AuthResponse.cpp
-    module.cpp
+    TokenFailure.cpp
+    TokenRequestParams.cpp
+    TokenRequestResult.cpp
+    TokenResponse.cpp
     ${API_NAME}.def)
 
 string(REPLACE "/" "\\" COPY_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/../../client/${API_NAME}.dll)

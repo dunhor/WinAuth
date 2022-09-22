@@ -18,22 +18,16 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
 
     struct AuthManager : AuthManagerT<AuthManager, implementation::AuthManager, winrt::static_lifetime>
     {
-        winrt::Windows::Foundation::IAsyncOperation<
-            winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult>
-        InitiateAuthRequestAsync(const winrt::Windows::Foundation::Uri& authEndpoint,
-            const winrt::Microsoft::Security::Authentication::OAuth::AuthRequestParams& params);
-        winrt::Windows::Foundation::IAsyncOperation<
-            winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult>
-        InitiateAuthRequestAsync(const winrt::Windows::Foundation::Uri& authEndpoint,
-            const winrt::Microsoft::Security::Authentication::OAuth::AuthRequestParams& params,
-            const winrt::hstring& clientSecret);
-        bool CompleteAuthRequest(const winrt::Windows::Foundation::Uri& responseUri);
+        foundation::IAsyncOperation<oauth::AuthRequestResult> InitiateAuthRequestAsync(foundation::Uri authEndpoint,
+            oauth::AuthRequestParams params);
+        bool CompleteAuthRequest(const foundation::Uri& responseUri);
+        foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
+            oauth::TokenRequestParams params);
 
         // Private functions
         std::wstring generate_unique_state();
 
     private:
-
         std::shared_mutex m_mutex;
         std::vector<AuthRequestState> m_pendingAuthRequests;
     };
@@ -43,28 +37,22 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct AuthManager
     {
-        static winrt::Windows::Foundation::IAsyncOperation<
-            winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult>
-        InitiateAuthRequestAsync(const winrt::Windows::Foundation::Uri& authEndpoint,
-            const winrt::Microsoft::Security::Authentication::OAuth::AuthRequestParams& params)
+        static foundation::IAsyncOperation<oauth::AuthRequestResult> InitiateAuthRequestAsync(
+            foundation::Uri authEndpoint, oauth::AuthRequestParams params)
         {
             return winrt::make_self<factory_implementation::AuthManager>()->InitiateAuthRequestAsync(authEndpoint,
                 params);
         }
 
-        static winrt::Windows::Foundation::IAsyncOperation<
-            winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult>
-        InitiateAuthRequestAsync(const winrt::Windows::Foundation::Uri& authEndpoint,
-            const winrt::Microsoft::Security::Authentication::OAuth::AuthRequestParams& params,
-            const winrt::hstring& clientSecret)
-        {
-            return winrt::make_self<factory_implementation::AuthManager>()->InitiateAuthRequestAsync(authEndpoint,
-                params, clientSecret);
-        }
-
-        static bool CompleteAuthRequest(const winrt::Windows::Foundation::Uri& responseUri)
+        static bool CompleteAuthRequest(const foundation::Uri& responseUri)
         {
             return winrt::make_self<factory_implementation::AuthManager>()->CompleteAuthRequest(responseUri);
+        }
+
+        static foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
+            oauth::TokenRequestParams params)
+        {
+            return winrt::make_self<factory_implementation::AuthManager>()->RequestTokenAsync(tokenEndpoint, params);
         }
     };
 }

@@ -9,13 +9,18 @@ using namespace winrt::Windows::Foundation::Collections;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
+    Uri AuthRequestResult::ResponseUri()
+    {
+        return m_responseUri;
+    }
+
     AuthResponse AuthRequestResult::Response()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_response;
     }
 
     AuthFailure AuthRequestResult::Failure()
     {
-        throw hresult_not_implemented(); // TODO
+        return m_failure;
     }
 }

@@ -170,12 +170,12 @@ try
     std::printf("Client secret: ");
     std::wcin >> clientSecret;
 
-    AuthRequestParams params(clientId, L"code", Uri(callback_url));
+    auto params = AuthRequestParams::CreateForAuthorizationCodeRequest(clientId, Uri(callback_url));
     params.Scope(L"read:user user:email");
 
     auto event = ::CreateEventW(nullptr, true, false, nullptr);
 
-    auto op = AuthManager::InitiateAuthRequestAsync(Uri(auth_url), params, clientSecret);
+    auto op = AuthManager::InitiateAuthRequestAsync(Uri(auth_url), params);
     op.Completed([&](const IAsyncOperation<AuthRequestResult>& result, AsyncStatus status) {
         switch (status)
         {
