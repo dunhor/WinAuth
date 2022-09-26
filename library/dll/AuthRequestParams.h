@@ -7,7 +7,9 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct AuthRequestParams : AuthRequestParamsT<AuthRequestParams>
     {
-        AuthRequestParams() = default;
+        AuthRequestParams(const winrt::hstring& responseType, const winrt::hstring& clientId);
+        AuthRequestParams(const winrt::hstring& responseType, const winrt::hstring& clientId,
+            const foundation::Uri& redirectUri);
 
         static oauth::AuthRequestParams CreateForAuthorizationCodeRequest(const winrt::hstring& clientId);
         static oauth::AuthRequestParams CreateForAuthorizationCodeRequest(const winrt::hstring& clientId,
@@ -36,18 +38,12 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 
         // Implementation functions
         void finalize();
-        std::wstring query_string();
+        void set_state(winrt::hstring value);
+        void set_code_verifier(winrt::hstring value);
+        std::wstring create_url(const foundation::Uri& authEndpoint);
 
     private:
-        void check_not_finalized()
-        {
-            // NOTE: Lock should be held when calling
-            if (m_finalized)
-            {
-                throw winrt::hresult_illegal_method_call(
-                    L"AuthRequestParams object cannot be modified after being used to initiate a request");
-            }
-        }
+        void check_not_finalized();
 
         std::shared_mutex m_mutex;
         bool m_finalized = false;

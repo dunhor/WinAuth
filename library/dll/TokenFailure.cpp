@@ -1,5 +1,5 @@
-#include "pch.h"
 #include "TokenFailure.h"
+#include "pch.h"
 #include <TokenFailure.g.cpp>
 
 using namespace std::literals;

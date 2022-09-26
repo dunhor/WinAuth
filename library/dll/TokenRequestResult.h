@@ -9,7 +9,6 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         oauth::TokenFailure Failure();
 
     private:
-
         oauth::TokenResponse m_response;
         oauth::TokenFailure m_failure;
     };

@@ -1,6 +1,5 @@
 #include "pch.h"
 
-#include "AuthManager.h"
 #include "AuthRequestParams.h"
 #include <AuthRequestParams.g.cpp>
 
@@ -12,44 +11,40 @@ using namespace winrt::Windows::Security::Cryptography::Core;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
+    AuthRequestParams::AuthRequestParams(const winrt::hstring& responseType, const winrt::hstring& clientId) :
+        m_responseType(responseType),
+        m_clientId(clientId)
+    {
+    }
+
+    AuthRequestParams::AuthRequestParams(const winrt::hstring& responseType, const winrt::hstring& clientId,
+        const Uri& redirectUri) :
+        m_responseType(responseType),
+        m_clientId(clientId),
+        m_redirectUri(redirectUri)
+    {
+    }
+
     oauth::AuthRequestParams AuthRequestParams::CreateForAuthorizationCodeRequest(const winrt::hstring& clientId)
     {
-        auto result = winrt::make_self<AuthRequestParams>();
-        result->m_responseType = L"code";
-        result->m_clientId = clientId;
-
-        return *result;
+        return winrt::make<AuthRequestParams>(L"code", clientId);
     }
 
     oauth::AuthRequestParams AuthRequestParams::CreateForAuthorizationCodeRequest(const winrt::hstring& clientId,
         const Uri& redirectUri)
     {
-        auto result = winrt::make_self<AuthRequestParams>();
-        result->m_responseType = L"code";
-        result->m_clientId = clientId;
-        result->m_redirectUri = redirectUri;
-
-        return *result;
+        return winrt::make<AuthRequestParams>(L"code", clientId, redirectUri);
     }
 
     oauth::AuthRequestParams AuthRequestParams::CreateForImplicitRequest(const winrt::hstring& clientId)
     {
-        auto result = winrt::make_self<AuthRequestParams>();
-        result->m_responseType = L"token";
-        result->m_clientId = clientId;
-
-        return *result;
+        return winrt::make<AuthRequestParams>(L"token", clientId);
     }
 
     oauth::AuthRequestParams AuthRequestParams::CreateForImplicitRequest(const winrt::hstring& clientId,
         const Uri& redirectUri)
     {
-        auto result = winrt::make_self<AuthRequestParams>();
-        result->m_responseType = L"token";
-        result->m_clientId = clientId;
-        result->m_redirectUri = redirectUri;
-
-        return *result;
+        return winrt::make<AuthRequestParams>(L"token", clientId, redirectUri);
     }
 
     winrt::hstring AuthRequestParams::ResponseType()
@@ -169,25 +164,41 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         if (!m_codeVerifier.empty() && (m_codeChallengeMethod == CodeChallengeMethodKind::None))
         {
             throw winrt::hresult_illegal_method_call(
-                L"'CodeChallenge' cannot be set when 'CodeChallengeMethod' is set to 'None'");
-        }
-
-        if (m_state.empty())
-        {
-            m_state = winrt::make_self<factory_implementation::AuthManager>()->generate_unique_state();
-        }
-
-        if (m_codeVerifier.empty() && (m_codeChallengeMethod != CodeChallengeMethodKind::None))
-        {
-            // TODO: Set m_codeVerifier
+                L"'CodeVerifier' cannot be set when 'CodeChallengeMethod' is set to 'None'");
         }
     }
 
-    std::wstring AuthRequestParams::query_string()
+    void AuthRequestParams::set_state(winrt::hstring value)
+    {
+        std::lock_guard guard{ m_mutex };
+        WINRT_ASSERT(m_state.empty());
+        m_state = std::move(value);
+    }
+
+    void AuthRequestParams::set_code_verifier(winrt::hstring value)
+    {
+        std::lock_guard guard{ m_mutex };
+        WINRT_ASSERT(m_codeVerifier.empty());
+        WINRT_ASSERT(m_codeChallengeMethod != CodeChallengeMethodKind::None);
+        m_codeVerifier = std::move(value);
+    }
+
+    std::wstring AuthRequestParams::create_url(const Uri& authEndpoint)
     {
         std::shared_lock guard{ m_mutex };
+        WINRT_ASSERT(m_finalized);
 
-        std::wstring result = L"?state=";
+        // Per RFC 6749 section 3.1, the auth endpoint URI *MAY* contain a query string, which must be retained
+        std::wstring result{ authEndpoint.RawUri() };
+        if (authEndpoint.Query().empty())
+        {
+            result += L"?state=";
+        }
+        else
+        {
+            result += L"&state=";
+        }
+
         result += Uri::EscapeComponent(m_state);
 
         if (!m_responseType.empty())
@@ -217,26 +228,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         if (m_codeChallengeMethod == CodeChallengeMethodKind::S256)
         {
             result += L"&code_challenge_method=S256&code_challenge=";
-
-            auto sha256 = HashAlgorithmProvider::OpenAlgorithm(HashAlgorithmNames::Sha256());
-            auto buffer = CryptographicBuffer::ConvertStringToBinary(m_codeVerifier, BinaryStringEncoding::Utf8);
-            auto encodedHash = CryptographicBuffer::EncodeToBase64String(sha256.HashData(buffer));
-            // NOTE: WinRT doesn't have a 'Base64UrlEncode' function, so we need to manually convert
-            for (auto ch : encodedHash)
-            {
-                if (ch == '+')
-                {
-                    result.push_back('-');
-                }
-                else if (ch == '/')
-                {
-                    result.push_back('_');
-                }
-                else if (ch != '=')
-                {
-                    result.push_back(ch);
-                }
-            }
+            result += base64urlencode(sha256(m_codeVerifier));
         }
         else if (m_codeChallengeMethod == CodeChallengeMethodKind::Plain)
         {
@@ -253,5 +245,15 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         }
 
         return result;
+    }
+
+    void AuthRequestParams::check_not_finalized()
+    {
+        // NOTE: Lock should be held when calling
+        if (m_finalized)
+        {
+            throw winrt::hresult_illegal_method_call(
+                L"AuthRequestParams object cannot be modified after being used to initiate a request");
+        }
     }
 }

@@ -1,34 +1,65 @@
 #pragma once
 
-struct AuthRequestAsyncOperation : winrt::implements<AuthRequestAsyncOperation,
-    winrt::Windows::Foundation::IAsyncOperation<winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult>,
-    winrt::Windows::Foundation::IAsyncInfo>
-{
-    using result_type = winrt::Microsoft::Security::Authentication::OAuth::AuthRequestResult;
-    using handler_type = winrt::Windows::Foundation::AsyncOperationCompletedHandler<result_type>;
+#include "AuthRequestParams.h"
 
-    AuthRequestAsyncOperation() = default; // TODO
+struct AuthRequestAsyncOperation :
+    winrt::implements<AuthRequestAsyncOperation, foundation::IAsyncOperation<oauth::AuthRequestResult>,
+        foundation::IAsyncInfo>
+{
+    AuthRequestAsyncOperation(const foundation::Uri& authEndpoint, oauth::implementation::AuthRequestParams* params);
+    ~AuthRequestAsyncOperation();
 
     // IAsyncInfo
     winrt::hresult ErrorCode();
     uint32_t Id();
-    winrt::Windows::Foundation::AsyncStatus Status();
+    foundation::AsyncStatus Status();
     void Cancel();
     void Close();
 
     // IAsyncOperation
-    handler_type Completed();
-    void Completed(const handler_type& handler);
-    result_type GetResults();
+    foundation::AsyncOperationCompletedHandler<oauth::AuthRequestResult> Completed();
+    void Completed(const foundation::AsyncOperationCompletedHandler<oauth::AuthRequestResult>& handler);
+    oauth::AuthRequestResult GetResults();
+
+    // Internal functions
+    void complete(const foundation::Uri& responseUri);
+    void cancel();
+    void error(winrt::hresult hr);
 
 private:
+    enum class state
+    {
+        connecting,
+        reading,
+    };
 
-    void invoke_completed(const handler_type& handler);
+    static void CALLBACK async_callback(PTP_CALLBACK_INSTANCE, PVOID context, PTP_WAIT, TP_WAIT_RESULT waitResult);
+
+    bool try_create_pipe(const winrt::hstring& state);
+    void close_pipe();
+    void connect_to_new_client();
+    void initiate_read();
+    void on_read_complete();
+
+    void transition_state(foundation::AsyncStatus status, const foundation::Uri& responseUri = nullptr,
+        winrt::hresult hr = {});
+    void invoke_handler(const foundation::AsyncOperationCompletedHandler<oauth::AuthRequestResult>& handler);
 
     std::shared_mutex m_mutex;
-    result_type m_result{ nullptr };
+
+    winrt::com_ptr<oauth::implementation::AuthRequestParams> m_params;
+    std::wstring m_pipeName;
+    HANDLE m_pipe = INVALID_HANDLE_VALUE;
+    state m_state = state::connecting;
+    OVERLAPPED m_overlapped = {};
+    PTP_WAIT m_ptp = nullptr;
+    std::vector<std::uint8_t> m_pipeReadData;
+    std::uint8_t m_pipeReadBuffer[256];
+
+    // IAsyncOperation state
+    oauth::AuthRequestResult m_result{ nullptr };
     bool m_handlerSet = false;
-    handler_type m_handler;
-    winrt::Windows::Foundation::AsyncStatus m_status = winrt::Windows::Foundation::AsyncStatus::Started;
+    foundation::AsyncOperationCompletedHandler<oauth::AuthRequestResult> m_handler;
+    foundation::AsyncStatus m_status = foundation::AsyncStatus::Started;
     winrt::hresult m_error = {};
 };

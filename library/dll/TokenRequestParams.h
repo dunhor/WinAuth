@@ -8,6 +8,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
     struct TokenRequestParams : TokenRequestParamsT<TokenRequestParams>
     {
         TokenRequestParams() = default;
+        TokenRequestParams(const winrt::hstring& grantType);
 
         static oauth::TokenRequestParams CreateForAuthorizationCodeRequest(const oauth::AuthResponse& authResponse);
         static oauth::TokenRequestParams CreateForResourceOwnerPasswordCredentials(const winrt::hstring& username,
@@ -44,7 +45,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
             if (m_finalized)
             {
                 throw winrt::hresult_illegal_method_call(
-                    L"AuthRequestParams object cannot be modified after being used to initiate a request");
+                    L"TokenRequestParams object cannot be modified after being used to initiate a request");
             }
         }
 

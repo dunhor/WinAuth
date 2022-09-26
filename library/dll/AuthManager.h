@@ -24,10 +24,14 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
             oauth::TokenRequestParams params);
 
-        // Private functions
-        std::wstring generate_unique_state();
+        // Implementation functions
+        bool try_complete_local(const winrt::hstring& state, const foundation::Uri& responseUri);
+        void cancel(AuthRequestAsyncOperation* op);
+        void error(AuthRequestAsyncOperation* op, winrt::hresult hr);
 
     private:
+        AuthRequestState try_remove(AuthRequestAsyncOperation* op);
+
         std::shared_mutex m_mutex;
         std::vector<AuthRequestState> m_pendingAuthRequests;
     };

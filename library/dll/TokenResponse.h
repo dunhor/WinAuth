@@ -13,7 +13,6 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         collections::IMapView<winrt::hstring, json::IJsonValue> AdditionalParams();
 
     private:
-
         winrt::hstring m_accessToken;
         winrt::hstring m_tokenType;
         double m_expiresIn;

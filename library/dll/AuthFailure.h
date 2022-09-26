@@ -14,7 +14,6 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         collections::IMapView<winrt::hstring, winrt::hstring> AdditionalParams();
 
     private:
-
         winrt::hstring m_error;
         winrt::hstring m_errorDescription;
         foundation::Uri m_errorUri{ nullptr };

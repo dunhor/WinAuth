@@ -40,6 +40,8 @@ static constexpr const auto auth_url = L"https://github.com/login/oauth/authoriz
 static constexpr const auto token_url = L"https://github.com/login/oauth/access_token"sv;
 static constexpr const auto response_html =
     "<html><head><meta title='Authentication Complete'></head><body>Authentication is complete. You may now close this page and return to the application.</body></html>"sv;
+static constexpr const auto error_html =
+    "<html><head><meta title='Authentication Failed'></head><body>Unable to complete authentication. You may now close this page and return to the application.</body></html>"sv;
 
 static void set_known_header(HTTP_RESPONSE& response, int knownHeaderId, std::string_view str)
 {
@@ -66,15 +68,7 @@ static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID,
     }
     else if (request.Verb == HttpVerbGET)
     {
-        // Should ideally validate that this is from a request...
-        auto& request = *reinterpret_cast<HTTP_REQUEST*>(request_buffer);
-        if (!AuthManager::CompleteAuthRequest(Uri(request.CookedUrl.pFullUrl)))
-        {
-            std::printf("Unable to complete request for uri %ls\n", request.CookedUrl.pFullUrl);
-            // TODO: Ideally would send a response back to the user agent, however this shouldn't really happen in
-            // practice for this example, so we'll skip it for now
-            return;
-        }
+        std::printf("Request for: %ls\n", request.CookedUrl.pFullUrl);
 
         HTTP_RESPONSE response = {};
         response.StatusCode = 200;
@@ -85,8 +79,20 @@ static void CALLBACK server_io_completion_callback(PTP_CALLBACK_INSTANCE, PVOID,
 
         HTTP_DATA_CHUNK dataChunk = {};
         dataChunk.DataChunkType = HttpDataChunkFromMemory;
-        dataChunk.FromMemory.pBuffer = const_cast<char*>(response_html.data());
-        dataChunk.FromMemory.BufferLength = static_cast<ULONG>(response_html.size());
+
+        // Should ideally validate that this is from a request...
+        if (!AuthManager::CompleteAuthRequest(Uri(request.CookedUrl.pFullUrl)))
+        {
+            std::printf("ERROR: Unable to complete request...\n");
+
+            dataChunk.FromMemory.pBuffer = const_cast<char*>(error_html.data());
+            dataChunk.FromMemory.BufferLength = static_cast<ULONG>(error_html.size());
+        }
+        else
+        {
+            dataChunk.FromMemory.pBuffer = const_cast<char*>(response_html.data());
+            dataChunk.FromMemory.BufferLength = static_cast<ULONG>(response_html.size());
+        }
 
         response.EntityChunkCount = 1;
         response.pEntityChunks = &dataChunk;
@@ -170,13 +176,14 @@ try
     std::printf("Client secret: ");
     std::wcin >> clientSecret;
 
-    auto params = AuthRequestParams::CreateForAuthorizationCodeRequest(clientId, Uri(callback_url));
-    params.Scope(L"read:user user:email");
+    auto requestParams = AuthRequestParams::CreateForAuthorizationCodeRequest(clientId, Uri(callback_url));
+    requestParams.Scope(L"read:user user:email");
 
     auto event = ::CreateEventW(nullptr, true, false, nullptr);
 
-    auto op = AuthManager::InitiateAuthRequestAsync(Uri(auth_url), params);
-    op.Completed([&](const IAsyncOperation<AuthRequestResult>& result, AsyncStatus status) {
+    AuthResponse authResponse{ nullptr };
+    auto requestOp = AuthManager::InitiateAuthRequestAsync(Uri(auth_url), requestParams);
+    requestOp.Completed([&](const IAsyncOperation<AuthRequestResult>& result, AsyncStatus status) {
         switch (status)
         {
         case AsyncStatus::Completed: {
@@ -184,11 +191,17 @@ try
             if (auto response = requestResult.Response())
             {
                 std::printf("Authorization code: %ls\n", response.Code().c_str());
+                authResponse = response;
             }
             else
             {
-                // TODO auto failure = requestResult.Failure();
-                std::printf("Received a failure response from the server\n");
+                auto failure = requestResult.Failure();
+                std::printf("Received a failure response from the server: %ls\n", failure.Error().c_str());
+
+                if (auto desc = failure.ErrorDescription(); !desc.empty())
+                {
+                    std::printf("    %ls\n", desc.c_str());
+                }
             }
         }
         break;
@@ -204,7 +217,7 @@ try
         ::SetEvent(event);
     });
 
-    auto waitResult = ::WaitForSingleObject(event, 60000);
+    auto waitResult = ::WaitForSingleObject(event, 60 * 1000);
     switch (waitResult)
     {
     case WAIT_OBJECT_0:
@@ -213,7 +226,7 @@ try
 
     case WAIT_TIMEOUT:
         std::printf("Operation took longer than one minute; cancelling\n");
-        op.Cancel();
+        requestOp.Cancel();
         ::WaitForSingleObject(event, INFINITY);
         return ERROR_TIMEOUT;
 
@@ -221,6 +234,54 @@ try
         std::printf("ERROR: Failure waiting for request to complete (%lu)\n", ::GetLastError());
         return ::GetLastError();
     }
+
+    if (!authResponse)
+    {
+        return ERROR_ACCESS_DENIED;
+    }
+
+    auto tokenParams = TokenRequestParams::CreateForAuthorizationCodeRequest(authResponse);
+
+    TokenResponse tokenResponse{ nullptr };
+    auto tokenOp = AuthManager::RequestTokenAsync(Uri(token_url), tokenParams);
+    tokenOp.Completed([&](const IAsyncOperation<TokenRequestResult>& result, AsyncStatus status) {
+        switch (status)
+        {
+        case AsyncStatus::Completed: {
+            auto requestResult = result.GetResults();
+            if (auto response = requestResult.Response())
+            {
+                std::printf("Access token: %ls\n", response.AccessToken().c_str());
+                std::printf("Token type: %ls\n", response.TokenType().c_str());
+
+                if (auto refreshToken = response.RefreshToken(); !refreshToken.empty())
+                {
+                    std::printf("Refresh token: %ls\n", refreshToken.c_str());
+                }
+            }
+            else
+            {
+                auto failure = requestResult.Failure();
+                std::printf("Received a failure response from the server: %ls\n", failure.Error().c_str());
+
+                if (auto desc = failure.ErrorDescription(); !desc.empty())
+                {
+                    std::printf("    %ls\n", desc.c_str());
+                }
+            }
+        }
+        break;
+        case AsyncStatus::Canceled: std::printf("Request cancelled unexpectedly\n"); break;
+        case AsyncStatus::Error: std::printf("Request completed with error 0x%08X\n", result.ErrorCode().value); break;
+        case AsyncStatus::Started:
+        default: std::printf("Unexpected async completion\n"); break;
+        }
+
+        ::SetEvent(event);
+    });
+
+    waitResult = ::WaitForSingleObject(event, INFINITE);
+    // TODO
 
     return 0;
 }

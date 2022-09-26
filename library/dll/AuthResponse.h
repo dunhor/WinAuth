@@ -1,11 +1,13 @@
 #pragma once
 #include <AuthResponse.g.h>
 
+#include "AuthRequestParams.h"
+
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct AuthResponse : AuthResponseT<AuthResponse>
     {
-        AuthResponse(const foundation::Uri& responseUri);
+        AuthResponse(AuthRequestParams* params, const foundation::Uri& responseUri);
 
         winrt::hstring State();
         winrt::hstring Code();
@@ -15,7 +17,14 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         winrt::hstring Scope();
         collections::IMapView<winrt::hstring, winrt::hstring> AdditionalParams();
 
+        // Implementation functions
+        const winrt::com_ptr<AuthRequestParams>& request_params() const noexcept
+        {
+            return m_requestParams;
+        }
+
     private:
+        winrt::com_ptr<AuthRequestParams> m_requestParams;
 
         winrt::hstring m_state;
         winrt::hstring m_code;

@@ -1,5 +1,5 @@
-#include "pch.h"
 #include "TokenRequestResult.h"
+#include "pch.h"
 #include <TokenRequestResult.g.cpp>
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;

@@ -38,18 +38,23 @@ namespace Microsoft.Security.Authentication.OAuth
 
     runtimeclass AuthRequestParams
     {
-        // Create for an authorization code grant request ("code" response type) with required parameters, per RFC 6749
-        // section 4.1.1.
+        // Construct with required parameters
+        AuthRequestParams(String responseType, String clientId);
+        // Construct with required parameters as well as a redirect URI, which is frequently specified
+        AuthRequestParams(String responseType, String clientId, Windows.Foundation.Uri redirectUri);
+
+        // Helper method to create for an authorization code grant request ("code" response type) with required
+        // parameters, per RFC 6749 section 4.1.1.
         static AuthRequestParams CreateForAuthorizationCodeRequest(String clientId);
-        // Create for an authorization code grant request ("code" response type) with required parameters as well as a
-        // redirect URI, which is frequently specified.
+        // Helper method to create for an authorization code grant request ("code" response type) with required
+        // parameters as well as a redirect URI, which is frequently specified.
         static AuthRequestParams CreateForAuthorizationCodeRequest(String clientId, Windows.Foundation.Uri redirectUri);
 
-        // Create for an implicit grant request ("token" response type) with required parameters, per RFC 6749 section
-        // 4.2.1.
+        // Helper method to create for an implicit grant request ("token" response type) with required parameters, per
+        // RFC 6749 section 4.2.1.
         static AuthRequestParams CreateForImplicitRequest(String clientId);
-        // Create for an implicit grant request ("token" response type) with required parameters as well as a redirect
-        // URI, which is frequently specified.
+        // Helper method to create for an implicit grant request ("token" response type) with required parameters as
+        // well as a redirect URI, which is frequently specified.
         static AuthRequestParams CreateForImplicitRequest(String clientId, Windows.Foundation.Uri redirectUri);
 
         // Specifies the required "response_type" parameter of the authorization request. This property is initialized
@@ -218,23 +223,28 @@ namespace Microsoft.Security.Authentication.OAuth
     {
         // TODO: Client authorization!!!
 
-        // Create for an authorization code grant request ("authorization_code" grant type), initialized with the
-        // required parameters extracted from the authorization response, per RFC 6749 section 4.1.3.
+        // Construct with required parameters
+        TokenRequestParams(String grantType);
+
+        // Helper method to create for an authorization code grant request ("authorization_code" grant type),
+        // initialized with the required parameters extracted from the authorization response, per RFC 6749 section
+        // 4.1.3.
         static TokenRequestParams CreateForAuthorizationCodeRequest(AuthResponse authResponse);
 
-        // Create for a resource owner password credentials grant request ("password" grant type), initialized with the
-        // required parameters, per RFC 6749 section 4.3.2.
+        // Helper method to create for a resource owner password credentials grant request ("password" grant type),
+        // initialized with the required parameters, per RFC 6749 section 4.3.2.
         static TokenRequestParams CreateForResourceOwnerPasswordCredentials(String username, String password);
 
-        // Create for a client credentials grant request ("client_credentials" grant type), initialized with the
-        // required parameters, per RFC 6749 section 4.4.2.
+        // Helper method to create for a client credentials grant request ("client_credentials" grant type), initialized
+        // with the required parameters, per RFC 6749 section 4.4.2.
         static TokenRequestParams CreateForClientCredentials();
 
-        // Create for an extension grant request, using the provided URI for the grant type, per RFC 6749 section 4.5.
+        // Helper method to create for an extension grant request, using the provided URI for the grant type, per RFC
+        // 6749 section 4.5.
         static TokenRequestParams CreateForExtension(Windows.Foundation.Uri extensionUri);
 
-        // Create for an access token refresh request ("refresh_token" grant type), initialized with the required
-        // parameters, per RFC 6749 section 6.
+        // Helper method to create for an access token refresh request ("refresh_token" grant type), initialized with
+        // the required parameters, per RFC 6749 section 6.
         static TokenRequestParams CreateForRefreshToken(String refreshToken);
 
         // Specifies the required "grant_type" parameter of the token request. This property is initialized by the

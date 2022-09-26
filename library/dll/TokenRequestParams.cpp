@@ -1,6 +1,8 @@
-#include "pch.h"
 #include "TokenRequestParams.h"
+#include "pch.h"
 #include <TokenRequestParams.g.cpp>
+
+#include "AuthResponse.h"
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 using namespace winrt::Windows::Foundation;
@@ -8,21 +10,37 @@ using namespace Collections;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    oauth::TokenRequestParams TokenRequestParams::CreateForAuthorizationCodeRequest(const AuthResponse& authResponse)
+    TokenRequestParams::TokenRequestParams(const winrt::hstring& grantType) : m_grantType(grantType) {}
+
+    oauth::TokenRequestParams TokenRequestParams::CreateForAuthorizationCodeRequest(
+        const oauth::AuthResponse& authResponse)
     {
-        auto result = winrt::make_self<TokenRequestParams>();
-        result->m_grantType = L"authorization_code";
+        auto result = winrt::make_self<TokenRequestParams>(L"authorization_code");
         result->m_code = authResponse.Code();
-        // TODO: Redirect Uri
-        // TODO: Client id
+
+        auto implResponse = winrt::get_self<AuthResponse>(authResponse);
+        if (auto redirectUri = implResponse->request_params()->RedirectUri())
+        {
+            result->m_redirectUri = std::move(redirectUri);
+        }
+
+        if (auto clientId = implResponse->request_params()->ClientId(); !clientId.empty())
+        {
+            result->m_clientId = std::move(clientId);
+        }
+
+        if (auto codeVerifier = implResponse->request_params()->CodeVerifier(); !codeVerifier.empty())
+        {
+            result->m_codeVerifier = std::move(codeVerifier);
+        }
+
         return *result;
     }
 
     oauth::TokenRequestParams TokenRequestParams::CreateForResourceOwnerPasswordCredentials(
         const winrt::hstring& username, const winrt::hstring& password)
     {
-        auto result = winrt::make_self<TokenRequestParams>();
-        result->m_grantType = L"password";
+        auto result = winrt::make_self<TokenRequestParams>(L"password");
         result->m_username = username;
         result->m_password = password;
 
@@ -31,24 +49,17 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 
     oauth::TokenRequestParams TokenRequestParams::CreateForClientCredentials()
     {
-        auto result = winrt::make_self<TokenRequestParams>();
-        result->m_grantType = L"client_credentials";
-
-        return *result;
+        return winrt::make<TokenRequestParams>(L"client_credentials");
     }
 
     oauth::TokenRequestParams TokenRequestParams::CreateForExtension(const Uri& extensionUri)
     {
-        auto result = winrt::make_self<TokenRequestParams>();
-        result->m_grantType = extensionUri.RawUri();
-
-        return *result;
+        return winrt::make<TokenRequestParams>(extensionUri.RawUri());
     }
 
     oauth::TokenRequestParams TokenRequestParams::CreateForRefreshToken(const winrt::hstring& refreshToken)
     {
-        auto result = winrt::make_self<TokenRequestParams>();
-        result->m_grantType = L"refresh_token";
+        auto result = winrt::make_self<TokenRequestParams>(L"refresh_token");
         result->m_refreshToken = refreshToken;
 
         return *result;
