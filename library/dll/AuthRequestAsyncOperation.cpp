@@ -237,7 +237,7 @@ void AuthRequestAsyncOperation::transition_state(AsyncStatus status, const Uri& 
     AsyncOperationCompletedHandler<AuthRequestResult> handler;
     {
         std::lock_guard guard{ m_mutex };
-        close_pipe(); // TODO: Safe? Especially holding the lock? Probably not...
+        // TODO: Should probably close pipe, however we might be in a callback which would deadlock...
 
         // State change is initiated by AuthManager and should never happen twice
         WINRT_ASSERT(m_status == AsyncStatus::Started);
@@ -271,10 +271,13 @@ void CALLBACK AuthRequestAsyncOperation::async_callback(PTP_CALLBACK_INSTANCE, P
     try
     {
         DWORD bytes = 0;
-        BOOL overlappedResult = false;
+        DWORD overlappedError = ERROR_SUCCESS;
         if (waitResult == WAIT_OBJECT_0)
         {
-            overlappedResult = ::GetOverlappedResult(pThis->m_pipe, &pThis->m_overlapped, &bytes, false);
+            if (!::GetOverlappedResult(pThis->m_pipe, &pThis->m_overlapped, &bytes, false))
+            {
+                overlappedError = ::GetLastError();
+            }
         }
 
         switch (pThis->m_state)
@@ -283,14 +286,16 @@ void CALLBACK AuthRequestAsyncOperation::async_callback(PTP_CALLBACK_INSTANCE, P
             WINRT_ASSERT(waitResult == WAIT_OBJECT_0); // TODO: Is this valid? Maybe when we cancelled? Error?
             if (waitResult != WAIT_OBJECT_0)
             {
+                __debugbreak(); // TODO
                 WINRT_ASSERT(waitResult == WAIT_TIMEOUT);
                 throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT),
                     L"Timed out waiting for a client to connect to the pipe");
             }
-            else if (!overlappedResult)
+            else if (overlappedError != ERROR_SUCCESS)
             {
+                __debugbreak(); // TODO
                 // If ConnectNamedClient failed, assume we hit an unrecoverable failure
-                throw winrt::hresult_error(HRESULT_FROM_WIN32(::GetLastError()),
+                throw winrt::hresult_error(HRESULT_FROM_WIN32(overlappedError),
                     L"Failed waiting for a client to connect to the pipe");
             }
 
@@ -299,18 +304,24 @@ void CALLBACK AuthRequestAsyncOperation::async_callback(PTP_CALLBACK_INSTANCE, P
         break;
 
         case state::reading: {
-            if ((waitResult != WAIT_OBJECT_0) || !overlappedResult)
+            if (overlappedError == ERROR_MORE_DATA)
+            {
+                pThis->m_pipeReadData.insert(pThis->m_pipeReadData.end(), pThis->m_pipeReadBuffer,
+                    pThis->m_pipeReadBuffer + pThis->m_overlapped.InternalHigh);
+                pThis->initiate_read(); // Need more data before we can complete
+            }
+            else if ((waitResult != WAIT_OBJECT_0) || (overlappedError != ERROR_SUCCESS))
             {
                 // Ideally we could assume that read timeouts/failures were fatal, however we don't know if the client
                 // is trustworthy and we don't want some arbitrary process to bait us into terminating the request
                 // TODO: What about more data?
+                __debugbreak(); // TODO
                 [[maybe_unused]] auto disconnectResult = ::DisconnectNamedPipe(pThis->m_pipe);
                 WINRT_ASSERT(disconnectResult); // TODO: What if the client disconnected from us?
                 pThis->connect_to_new_client();
             }
             else
             {
-                // TODO: How do we know if more data is pending?
                 pThis->on_read_complete();
             }
         }
@@ -333,7 +344,7 @@ bool AuthRequestAsyncOperation::try_create_pipe(const winrt::hstring& state)
     auto name = request_pipe_name(state);
     m_pipe =
         ::CreateNamedPipeW(name.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
-            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS, 1, 2048, 2048, 0, nullptr);
+            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS, 1, 1024, 1024, 0, nullptr);
 
     if (m_pipe != INVALID_HANDLE_VALUE)
     {
@@ -380,10 +391,8 @@ void AuthRequestAsyncOperation::initiate_read()
         auto err = ::GetLastError();
         if (err == ERROR_MORE_DATA)
         {
-            // Partial read successful
-            // TODO: Test this
+            // Partial read successful; save data and continue loop to try and read more data
             m_pipeReadData.insert(m_pipeReadData.end(), m_pipeReadBuffer, m_pipeReadBuffer + m_overlapped.InternalHigh);
-            // Continue loop to try and read more data
         }
         else if (err == ERROR_IO_PENDING)
         {
@@ -396,8 +405,8 @@ void AuthRequestAsyncOperation::initiate_read()
         else
         {
             // TODO: Just abandon and connect to a new client?
+            __debugbreak(); // TODO
             throw winrt::hresult_error(HRESULT_FROM_WIN32(err), L"Failed to read data from pipe");
-            break;
         }
     }
 }
@@ -428,7 +437,6 @@ void AuthRequestAsyncOperation::on_read_complete()
     catch (...)
     {
         // Likely handed bad data; just disconnect and attempt a reconnect
-        // TODO
     }
 
     // The client will only ever send a single message, so disconnect and form a new connection

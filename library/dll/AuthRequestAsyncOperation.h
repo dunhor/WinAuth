@@ -54,7 +54,7 @@ private:
     OVERLAPPED m_overlapped = {};
     PTP_WAIT m_ptp = nullptr;
     std::vector<std::uint8_t> m_pipeReadData;
-    std::uint8_t m_pipeReadBuffer[256];
+    std::uint8_t m_pipeReadBuffer[128];
 
     // IAsyncOperation state
     oauth::AuthRequestResult m_result{ nullptr };

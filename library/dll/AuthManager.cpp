@@ -113,6 +113,12 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         return true;
     }
 
+    IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
+        oauth::TokenRequestParams params)
+    {
+        throw winrt::hresult_not_implemented(); // TODO
+    }
+
     bool AuthManager::try_complete_local(const winrt::hstring& state, const foundation::Uri& responseUri)
     {
         AuthRequestState requestState;
@@ -137,12 +143,6 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         }
 
         return false;
-    }
-
-    IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
-        oauth::TokenRequestParams params)
-    {
-        throw winrt::hresult_not_implemented(); // TODO
     }
 
     void AuthManager::cancel(AuthRequestAsyncOperation* op)
