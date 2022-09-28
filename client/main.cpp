@@ -8,6 +8,7 @@
 
 #include <http.h>
 
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 #include <winrt/Windows.Foundation.h>
 
@@ -243,6 +244,7 @@ try
     ::ResetEvent(event);
 
     auto tokenParams = TokenRequestParams::CreateForAuthorizationCodeRequest(authResponse);
+    tokenParams.AdditionalParams().Insert(L"client_secret", clientSecret);
 
     TokenResponse tokenResponse{ nullptr };
     auto tokenOp = AuthManager::RequestTokenAsync(Uri(token_url), tokenParams);

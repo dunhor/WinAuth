@@ -13,20 +13,19 @@ using namespace winrt::Windows::Web::Http;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    TokenRequestResult::TokenRequestResult(HttpResponseMessage responseMessage, const JsonObject& jsonObj) :
-        m_responseMessage(std::move(responseMessage))
+    TokenRequestResult::TokenRequestResult(HttpResponseMessage responseMessage, oauth::TokenResponse response,
+        oauth::TokenFailure failure) :
+        m_responseMessage(std::move(responseMessage)),
+        m_response(std::move(response)),
+        m_failure(std::move(failure))
     {
-        // NOTE: Every successful response should have a "token" and "token_type", and every failure should have
-        // "error". If none of these are present, we have to pick one or the other (or throw). We look for the presence
-        // of "error" here since that is the more "general" code path
-        if (jsonObj.HasKey(L"error"))
-        {
-            m_failure = winrt::make<TokenFailure>(jsonObj);
-        }
-        else
-        {
-            m_response = winrt::make<TokenResponse>(jsonObj);
-        }
+    }
+
+    oauth::TokenRequestResult TokenRequestResult::MakeFailure(HttpResponseMessage response,
+        TokenFailureKind failureKind, winrt::hresult failureCode)
+    {
+        return winrt::make<TokenRequestResult>(std::move(response), nullptr,
+            winrt::make<TokenFailure>(failureKind, failureCode));
     }
 
     HttpResponseMessage TokenRequestResult::ResponseMessage()

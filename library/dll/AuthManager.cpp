@@ -5,8 +5,10 @@
 #include <format>
 
 #include "AuthRequestParams.h"
+#include "TokenFailure.h"
 #include "TokenRequestParams.h"
 #include "TokenRequestResult.h"
+#include "TokenResponse.h"
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 using namespace winrt::Windows::Data::Json;
@@ -123,22 +125,69 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         auto paramsImpl = winrt::get_self<implementation::TokenRequestParams>(params);
         paramsImpl->finalize();
 
-        HttpClient httpClient;
-        HttpFormUrlEncodedContent content(winrt::single_threaded_map(paramsImpl->params()));
-        HttpRequestMessage request(HttpMethod::Post(), tokenEndpoint);
-        request.Content(HttpFormUrlEncodedContent(winrt::single_threaded_map(paramsImpl->params())));
-        request.Headers().Accept().ParseAdd(L"application/json");
+        HttpResponseMessage response{ nullptr };
+        winrt::hstring responseString;
+        try
+        {
+            HttpClient httpClient;
+            HttpFormUrlEncodedContent content(winrt::single_threaded_map(paramsImpl->params()));
+            HttpRequestMessage request(HttpMethod::Post(), tokenEndpoint);
+            request.Content(HttpFormUrlEncodedContent(winrt::single_threaded_map(paramsImpl->params())));
+            request.Headers().Accept().ParseAdd(L"application/json");
 
-        auto response = co_await httpClient.SendRequestAsync(request);
+            response = co_await httpClient.SendRequestAsync(request);
+            // TODO: Check status code?
+            if (!response.IsSuccessStatusCode())
+            {
+                __debugbreak(); // TODO
+                response.EnsureSuccessStatusCode(); // TODO: Could just use this?
+            }
 
-        // TODO: Currently we throw if the response doesn't have valid Json. This might be too harsh (e.g. as is the
-        // case here where we throw for an unsuccessful status code), however the 'AuthFailure' type is currently geared
-        // more towards valid server-response failures
-        response.EnsureSuccessStatusCode();
+            auto responseContentType = response.Content().Headers().ContentType().MediaType();
+            if (responseContentType != L"application/json")
+            {
+                co_return implementation::TokenRequestResult::MakeFailure(std::move(response),
+                    TokenFailureKind::InvalidResponse, WEB_E_UNSUPPORTED_FORMAT);
+            }
 
-        auto jsonString = co_await response.Content().ReadAsStringAsync();
-        auto jsonObj = JsonObject::Parse(jsonString);
-        co_return winrt::make<implementation::TokenRequestResult>(std::move(response), jsonObj);
+            responseString = co_await response.Content().ReadAsStringAsync();
+        }
+        catch (...)
+        {
+            co_return implementation::TokenRequestResult::MakeFailure(std::move(response),
+                TokenFailureKind::HttpFailure, winrt::to_hresult());
+        }
+
+        JsonObject jsonObject{ nullptr };
+        if (!JsonObject::TryParse(responseString, jsonObject))
+        {
+            co_return implementation::TokenRequestResult::MakeFailure(std::move(response),
+                TokenFailureKind::InvalidResponse, WEB_E_INVALID_JSON_STRING);
+        }
+        else
+        {
+            try
+            {
+                // Determine if it's a success or error response based on the presence of 'error'
+                if (jsonObject.HasKey(L"error"))
+                {
+                    auto failure = winrt::make<implementation::TokenFailure>(jsonObject);
+                    co_return winrt::make<implementation::TokenRequestResult>(std::move(response), nullptr,
+                        std::move(failure));
+                }
+                else
+                {
+                    auto success = winrt::make<implementation::TokenResponse>(jsonObject);
+                    co_return winrt::make<implementation::TokenRequestResult>(std::move(response), std::move(success),
+                        nullptr);
+                }
+            }
+            catch (...)
+            {
+                co_return implementation::TokenRequestResult::MakeFailure(std::move(response),
+                    TokenFailureKind::InvalidResponse, winrt::to_hresult());
+            }
+        }
     }
 
     bool AuthManager::try_complete_local(const winrt::hstring& state, const foundation::Uri& responseUri)

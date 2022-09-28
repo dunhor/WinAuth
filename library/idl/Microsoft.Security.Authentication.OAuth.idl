@@ -364,8 +364,29 @@ namespace Microsoft.Security.Authentication.OAuth
         Windows.Foundation.Collections.IMapView<String, Windows.Data.Json.IJsonValue> AdditionalParams { get; };
     }
 
+    enum TokenFailureKind
+    {
+        // The server responded with an error response as described by RFC 6749 section 5.2. This means that the failure
+        // object has an 'Error' string and possibly other specified properties.
+        ErrorResponse = 0,
+
+        // The HTTP POST request failed. See the 'ErrorCode' property for more details as to why.
+        HttpFailure = 1,
+
+        // The server responded, but its response was improperly formatted. This could be that the server did not send
+        // the response as JSON, the response JSON string was improperly formatted, or the response JSON contained
+        // unexpected object types (e.g. a number when a string is expected, etc.).
+        InvalidResponse = 2,
+    };
+
     runtimeclass TokenFailure
     {
+        // Indicates the type of failure that this object describes, which will indicate which properties might be set.
+        TokenFailureKind Kind { get; };
+
+        // If 'Kind' was anything other than 'ErrorResponse',
+        HRESULT ErrorCode { get; };
+
         // From the "error" parameter of the error response. The value of this property will map to a well known string
         // specified in RFC 6749 section 5.2, or approved extensions.
         //
@@ -402,43 +423,4 @@ namespace Microsoft.Security.Authentication.OAuth
         // Non-null if the server's response indicates failure, otherwise null
         TokenFailure Failure { get; };
     }
-
-    /*
-    // Static strings types
-
-    // TODO
-    static runtimeclass AuthResponseTypes
-    {
-        static String Code { get; }; // "code"
-        static String Token { get; }; // "token"
-    }
-
-    static runtimeclass GrantTypes
-    {
-        static String AuthorizationCode { get; }; // "authorization_code"
-        static String Password { get; }; // "password"
-        static String ClientCredentials { get; }; // "client_credentials"
-    }
-
-    // TODO: Token types?
-
-    static runtimeclass ErrorResponseTypes
-    {
-        // Relevant for both authorization request responses and auth token responses
-        static String InvalidRequest { get; }; // "invalid_request"
-        static String UnauthorizedClient { get; }; // "unauthorized_client"
-        static String InvalidScope { get; }; // "invalid_scope"
-
-        // Relevant for only authorization request responses
-        static String AccessDenied { get; }; // "access_denied"
-        static String UnsupportedResponseType { get; }; // "unsupported_response_type"
-        static String ServerError { get; }; // "server_error"
-        static String TemporarilyUnavailable { get; }; // "temporarily_unavailable"
-
-        // Relevant for only access token responses
-        static String InvalidClient { get; }; // "invalid_client"
-        static String InvalidGrant { get; }; // "invalid_grant"
-        static String UnsupportedGrantType { get; }; // "unsupported_grant_type"
-    }
-    */
 }

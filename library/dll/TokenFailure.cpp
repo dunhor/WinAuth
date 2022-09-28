@@ -10,18 +10,23 @@ using namespace winrt::Windows::Foundation::Collections;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
-    TokenFailure::TokenFailure(const JsonObject& jsonObject)
+    TokenFailure::TokenFailure(TokenFailureKind kind, winrt::hresult code) : m_kind(kind), m_errorCode(code) {}
+
+    TokenFailure::TokenFailure(const JsonObject& jsonObject) :
+        m_kind(TokenFailureKind::ErrorResponse),
+        m_errorCode(E_FAIL)
     {
         std::map<winrt::hstring, IJsonValue> additionalParams;
 
-        // NOTE: Functions like 'GetString' will throw if the value is not the requested type. It might be worth
-        // revisiting this in the future
+        // NOTE: Functions like 'GetString' will throw if the value is not the requested type, so the calling code must
+        // be ready to handle such failures
         for (auto&& pair : jsonObject)
         {
             auto name = pair.Key();
             if (name == L"error"sv)
             {
                 m_error = pair.Value().GetString();
+                // TODO: Use the error string to set a more accurate HRESULT?
             }
             else if (name == L"error_description"sv)
             {
@@ -38,6 +43,16 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         }
 
         m_additionalParams = winrt::single_threaded_map(std::move(additionalParams)).GetView();
+    }
+
+    TokenFailureKind TokenFailure::Kind()
+    {
+        return m_kind;
+    }
+
+    winrt::hresult TokenFailure::ErrorCode()
+    {
+        return m_errorCode;
     }
 
     winrt::hstring TokenFailure::Error()

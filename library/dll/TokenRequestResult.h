@@ -5,7 +5,11 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct TokenRequestResult : TokenRequestResultT<TokenRequestResult>
     {
-        TokenRequestResult(http::HttpResponseMessage responseMessage, const json::JsonObject& obj);
+        TokenRequestResult(http::HttpResponseMessage responseMessage, oauth::TokenResponse resposne,
+            oauth::TokenFailure failure);
+
+        static oauth::TokenRequestResult MakeFailure(http::HttpResponseMessage response, TokenFailureKind failureKind,
+            winrt::hresult failureCode);
 
         http::HttpResponseMessage ResponseMessage();
         oauth::TokenResponse Response();
