@@ -5,15 +5,19 @@
 #include <format>
 
 #include "AuthRequestParams.h"
+#include "TokenRequestParams.h"
+#include "TokenRequestResult.h"
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
+using namespace winrt::Windows::Data::Json;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
+using namespace winrt::Windows::Web::Http;
 
 namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementation
 {
-    IAsyncOperation<AuthRequestResult> AuthManager::InitiateAuthRequestAsync(Uri authEndpoint,
-        oauth::AuthRequestParams params)
+    IAsyncOperation<AuthRequestResult> AuthManager::InitiateAuthRequestAsync(const Uri& authEndpoint,
+        const oauth::AuthRequestParams& params)
     {
         auto asyncOp = winrt::make_self<AuthRequestAsyncOperation>(authEndpoint,
             winrt::get_self<implementation::AuthRequestParams>(params));
@@ -48,7 +52,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         }
 
         // First check in our local pending list
-        if (false && try_complete_local(state, responseUri)) // TODO: Short circuiting for testing
+        if (try_complete_local(state, responseUri))
         {
             return true;
         }
@@ -103,7 +107,7 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         if (!::WriteFile(pipe, encryptedUri.data(), bytesToWrite, &bytesWritten, nullptr) ||
             (bytesWritten != bytesToWrite))
         {
-            // TODO: Actual error? This could be because the server timed out...
+            // TODO: Actual error? This could be because the server timed us out...
             ::CloseHandle(pipe);
             return false;
         }
@@ -116,7 +120,25 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
     IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
         oauth::TokenRequestParams params)
     {
-        throw winrt::hresult_not_implemented(); // TODO
+        auto paramsImpl = winrt::get_self<implementation::TokenRequestParams>(params);
+        paramsImpl->finalize();
+
+        HttpClient httpClient;
+        HttpFormUrlEncodedContent content(winrt::single_threaded_map(paramsImpl->params()));
+        HttpRequestMessage request(HttpMethod::Post(), tokenEndpoint);
+        request.Content(HttpFormUrlEncodedContent(winrt::single_threaded_map(paramsImpl->params())));
+        request.Headers().Accept().ParseAdd(L"application/json");
+
+        auto response = co_await httpClient.SendRequestAsync(request);
+
+        // TODO: Currently we throw if the response doesn't have valid Json. This might be too harsh (e.g. as is the
+        // case here where we throw for an unsuccessful status code), however the 'AuthFailure' type is currently geared
+        // more towards valid server-response failures
+        response.EnsureSuccessStatusCode();
+
+        auto jsonString = co_await response.Content().ReadAsStringAsync();
+        auto jsonObj = JsonObject::Parse(jsonString);
+        co_return winrt::make<implementation::TokenRequestResult>(std::move(response), jsonObj);
     }
 
     bool AuthManager::try_complete_local(const winrt::hstring& state, const foundation::Uri& responseUri)

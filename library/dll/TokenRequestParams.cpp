@@ -194,4 +194,48 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         check_not_finalized();
         m_additionalParams = value;
     }
+
+    void TokenRequestParams::finalize()
+    {
+        std::lock_guard guard{ m_mutex };
+        if (m_finalized)
+        {
+            throw winrt::hresult_illegal_method_call(L"TokenRequestParams can only be used for a single request call");
+        }
+
+        m_finalized = true;
+    }
+
+    std::map<winrt::hstring, winrt::hstring> TokenRequestParams::params()
+    {
+        // HttpFormUrlEncodedContent requires an IIterable<IKeyValuePair<String, String>> as input. In theory we can
+        // make the TokenRequestParams implement this type to save on some work, however this may be a little tricky
+        std::map<winrt::hstring, winrt::hstring> result;
+        auto addIfSet = [&](std::wstring_view key, const winrt::hstring& value) {
+            if (!value.empty())
+            {
+                result.emplace(key, value);
+            }
+        };
+
+        std::shared_lock guard{ m_mutex };
+        addIfSet(L"grant_type", m_grantType);
+        addIfSet(L"code", m_code);
+        if (m_redirectUri) result.emplace(L"redirect_uri", m_redirectUri.RawUri());
+        addIfSet(L"code_verifier", m_codeVerifier);
+        addIfSet(L"client_id", m_clientId);
+        addIfSet(L"username", m_username);
+        addIfSet(L"password", m_password);
+        addIfSet(L"scope", m_scope);
+        addIfSet(L"refresh_token", m_refreshToken);
+        if (m_additionalParams)
+        {
+            for (auto&& pair : m_additionalParams)
+            {
+                result.emplace(pair.Key(), pair.Value());
+            }
+        }
+
+        return result;
+    }
 }

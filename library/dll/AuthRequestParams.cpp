@@ -236,12 +236,15 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
             result += Uri::EscapeComponent(m_codeVerifier);
         }
 
-        for (auto&& pair : m_additionalParams)
+        if (m_additionalParams)
         {
-            result += L"&";
-            result += Uri::EscapeComponent(pair.Key());
-            result += L"=";
-            result += Uri::EscapeComponent(pair.Value());
+            for (auto&& pair : m_additionalParams)
+            {
+                result += L"&";
+                result += Uri::EscapeComponent(pair.Key());
+                result += L"=";
+                result += Uri::EscapeComponent(pair.Value());
+            }
         }
 
         return result;

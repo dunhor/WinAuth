@@ -14,6 +14,8 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
     {
         std::map<winrt::hstring, IJsonValue> additionalParams;
 
+        // NOTE: Functions like 'GetString' will throw if the value is not the requested type. It might be worth
+        // revisiting this in the future
         for (auto&& pair : jsonObject)
         {
             auto name = pair.Key();

@@ -5,6 +5,8 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
 {
     struct TokenResponse : TokenResponseT<TokenResponse>
     {
+        TokenResponse(const json::JsonObject& jsonObject);
+
         winrt::hstring AccessToken();
         winrt::hstring TokenType();
         double ExpiresIn();

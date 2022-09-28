@@ -1,5 +1,6 @@
 
 import "Windows.Data.Json.idl";
+import "Windows.Web.Http.idl";
 
 namespace Microsoft.Security.Authentication.OAuth
 {
@@ -392,7 +393,8 @@ namespace Microsoft.Security.Authentication.OAuth
 
     runtimeclass TokenRequestResult
     {
-        // TODO: Raw response
+        // The raw HTTP response that was used to complete the request
+        Windows.Web.Http.HttpResponseMessage ResponseMessage { get; };
 
         // Non-null if the server's response indicates success, otherwise null
         TokenResponse Response { get; };

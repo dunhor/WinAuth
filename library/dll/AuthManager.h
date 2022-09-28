@@ -18,8 +18,8 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
 
     struct AuthManager : AuthManagerT<AuthManager, implementation::AuthManager, winrt::static_lifetime>
     {
-        foundation::IAsyncOperation<oauth::AuthRequestResult> InitiateAuthRequestAsync(foundation::Uri authEndpoint,
-            oauth::AuthRequestParams params);
+        foundation::IAsyncOperation<oauth::AuthRequestResult> InitiateAuthRequestAsync(
+            const foundation::Uri& authEndpoint, const oauth::AuthRequestParams& params);
         bool CompleteAuthRequest(const foundation::Uri& responseUri);
         foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
             oauth::TokenRequestParams params);

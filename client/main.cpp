@@ -240,6 +240,8 @@ try
         return ERROR_ACCESS_DENIED;
     }
 
+    ::ResetEvent(event);
+
     auto tokenParams = TokenRequestParams::CreateForAuthorizationCodeRequest(authResponse);
 
     TokenResponse tokenResponse{ nullptr };
@@ -267,6 +269,11 @@ try
                 if (auto desc = failure.ErrorDescription(); !desc.empty())
                 {
                     std::printf("    %ls\n", desc.c_str());
+                }
+
+                if (auto uri = failure.ErrorUri())
+                {
+                    std::printf("    See: %ls\n", uri.RawUri().c_str());
                 }
             }
         }

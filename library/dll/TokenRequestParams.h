@@ -38,6 +38,10 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         collections::IMap<winrt::hstring, winrt::hstring> AdditionalParams();
         void AdditionalParams(const collections::IMap<winrt::hstring, winrt::hstring>& value);
 
+        // Implementation functions
+        void finalize();
+        std::map<winrt::hstring, winrt::hstring> params();
+
     private:
         void check_not_finalized()
         {

@@ -92,7 +92,9 @@ void AuthRequestAsyncOperation::close_pipe()
 {
     if (m_state == state::reading)
     {
-        ::CancelIoEx(m_pipe, &m_overlapped); // TODO
+        // TODO: Might this trigger a callback? If so, we may end up trying to perform more operations... Might need
+        // some synchronization and another state value here.
+        ::CancelIoEx(m_pipe, &m_overlapped);
     }
 
     if (m_ptp)
@@ -286,14 +288,12 @@ void CALLBACK AuthRequestAsyncOperation::async_callback(PTP_CALLBACK_INSTANCE, P
             WINRT_ASSERT(waitResult == WAIT_OBJECT_0); // TODO: Is this valid? Maybe when we cancelled? Error?
             if (waitResult != WAIT_OBJECT_0)
             {
-                __debugbreak(); // TODO
                 WINRT_ASSERT(waitResult == WAIT_TIMEOUT);
                 throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT),
                     L"Timed out waiting for a client to connect to the pipe");
             }
             else if (overlappedError != ERROR_SUCCESS)
             {
-                __debugbreak(); // TODO
                 // If ConnectNamedClient failed, assume we hit an unrecoverable failure
                 throw winrt::hresult_error(HRESULT_FROM_WIN32(overlappedError),
                     L"Failed waiting for a client to connect to the pipe");
@@ -312,10 +312,8 @@ void CALLBACK AuthRequestAsyncOperation::async_callback(PTP_CALLBACK_INSTANCE, P
             }
             else if ((waitResult != WAIT_OBJECT_0) || (overlappedError != ERROR_SUCCESS))
             {
-                // Ideally we could assume that read timeouts/failures were fatal, however we don't know if the client
-                // is trustworthy and we don't want some arbitrary process to bait us into terminating the request
-                // TODO: What about more data?
-                __debugbreak(); // TODO
+                // Ideally we could assume that read timeouts/failures are fatal, however we don't know if the client is
+                // trustworthy and we don't want some arbitrary process to bait us into terminating the request
                 [[maybe_unused]] auto disconnectResult = ::DisconnectNamedPipe(pThis->m_pipe);
                 WINRT_ASSERT(disconnectResult); // TODO: What if the client disconnected from us?
                 pThis->connect_to_new_client();
@@ -404,9 +402,12 @@ void AuthRequestAsyncOperation::initiate_read()
         }
         else
         {
-            // TODO: Just abandon and connect to a new client?
-            __debugbreak(); // TODO
-            throw winrt::hresult_error(HRESULT_FROM_WIN32(err), L"Failed to read data from pipe");
+            // Ideally we could assume that read timeouts/failures are fatal, however we don't know if the client is
+            // trustworthy and we don't want some arbitrary process to bait us into terminating the request
+            [[maybe_unused]] auto disconnectResult = ::DisconnectNamedPipe(m_pipe);
+            WINRT_ASSERT(disconnectResult); // TODO: What if the client disconnected from us?
+            connect_to_new_client();
+            break;
         }
     }
 }
