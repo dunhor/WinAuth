@@ -122,6 +122,12 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
     IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
         oauth::TokenRequestParams params)
     {
+        return RequestTokenAsync(std::move(tokenEndpoint), std::move(params), nullptr);
+    }
+
+    IAsyncOperation<oauth::TokenRequestResult> AuthManager::RequestTokenAsync(Uri tokenEndpoint,
+        oauth::TokenRequestParams params, oauth::ClientAuthentication clientAuth)
+    {
         auto paramsImpl = winrt::get_self<implementation::TokenRequestParams>(params);
         paramsImpl->finalize();
 
@@ -133,7 +139,30 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
             HttpFormUrlEncodedContent content(winrt::single_threaded_map(paramsImpl->params()));
             HttpRequestMessage request(HttpMethod::Post(), tokenEndpoint);
             request.Content(HttpFormUrlEncodedContent(winrt::single_threaded_map(paramsImpl->params())));
-            request.Headers().Accept().ParseAdd(L"application/json");
+
+            auto headers = request.Headers();
+            headers.Accept().ParseAdd(L"application/json");
+
+            if (auto auth = clientAuth.Authorization())
+            {
+                headers.Authorization(auth);
+            }
+
+            if (auto proxyAuth = clientAuth.ProxyAuthorization())
+            {
+                headers.ProxyAuthorization(proxyAuth);
+            }
+
+            if (auto map = clientAuth.AdditionalHeaders())
+            {
+                for (auto&& pair : map)
+                {
+                    if (!headers.TryAppendWithoutValidation(pair.Key(), pair.Value()))
+                    {
+                        // TODO? Why might this fail? Throw?
+                    }
+                }
+            }
 
             response = co_await httpClient.SendRequestAsync(request);
             // TODO: Check status code?

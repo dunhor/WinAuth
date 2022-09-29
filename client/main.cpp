@@ -244,10 +244,10 @@ try
     ::ResetEvent(event);
 
     auto tokenParams = TokenRequestParams::CreateForAuthorizationCodeRequest(authResponse);
-    tokenParams.AdditionalParams().Insert(L"client_secret", clientSecret);
+    auto clientAuth = ClientAuthentication::CreateForBasicAuthorization(clientId, clientSecret);
 
     TokenResponse tokenResponse{ nullptr };
-    auto tokenOp = AuthManager::RequestTokenAsync(Uri(token_url), tokenParams);
+    auto tokenOp = AuthManager::RequestTokenAsync(Uri(token_url), tokenParams, clientAuth);
     tokenOp.Completed([&](const IAsyncOperation<TokenRequestResult>& result, AsyncStatus status) {
         switch (status)
         {

@@ -23,6 +23,8 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::factory_implementat
         bool CompleteAuthRequest(const foundation::Uri& responseUri);
         foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
             oauth::TokenRequestParams params);
+        foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
+            oauth::TokenRequestParams params, oauth::ClientAuthentication clientAuth);
 
         // Implementation functions
         bool try_complete_local(const winrt::hstring& state, const foundation::Uri& responseUri);
@@ -56,7 +58,15 @@ namespace winrt::Microsoft::Security::Authentication::OAuth::implementation
         static foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
             oauth::TokenRequestParams params)
         {
-            return winrt::make_self<factory_implementation::AuthManager>()->RequestTokenAsync(tokenEndpoint, params);
+            return winrt::make_self<factory_implementation::AuthManager>()->RequestTokenAsync(std::move(tokenEndpoint),
+                std::move(params));
+        }
+
+        static foundation::IAsyncOperation<oauth::TokenRequestResult> RequestTokenAsync(foundation::Uri tokenEndpoint,
+            oauth::TokenRequestParams params, oauth::ClientAuthentication clientAuth)
+        {
+            return winrt::make_self<factory_implementation::AuthManager>()->RequestTokenAsync(std::move(tokenEndpoint),
+                std::move(params), std::move(clientAuth));
         }
     };
 }

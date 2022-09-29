@@ -43,6 +43,7 @@ target_sources(${API_NAME} PRIVATE
     AuthRequestParams.cpp
     AuthRequestResult.cpp
     AuthResponse.cpp
+    ClientAuthentication.cpp
     TokenFailure.cpp
     TokenRequestParams.cpp
     TokenRequestResult.cpp

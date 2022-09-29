@@ -4,6 +4,23 @@ import "Windows.Web.Http.idl";
 
 namespace Microsoft.Security.Authentication.OAuth
 {
+    runtimeclass ClientAuthentication
+    {
+        ClientAuthentication();
+        ClientAuthentication(Windows.Web.Http.Headers.HttpCredentialsHeaderValue authorization);
+
+        static ClientAuthentication CreateForBasicAuthorization(String clientId, String clientSecret);
+
+        // Specifies the 'Authorization' header of the HTTP POST request when requesting a token
+        Windows.Web.Http.Headers.HttpCredentialsHeaderValue Authorization { get; set; };
+
+        // Specifies the 'Proxy-Authorization' header of the HTTP POST request when requesting a token
+        Windows.Web.Http.Headers.HttpCredentialsHeaderValue ProxyAuthorization { get; set; };
+
+        // Specifies additional header values of the HTTP POST request when requesting a token
+        Windows.Foundation.Collections.IMap<String, String> AdditionalHeaders { get; set; };
+    }
+
     static runtimeclass AuthManager
     {
         // Initiates an authorization request in the user's default browser as described by RFC 6749 section 3.1. The
@@ -22,6 +39,12 @@ namespace Microsoft.Security.Authentication.OAuth
         static Windows.Foundation.IAsyncOperation<TokenRequestResult> RequestTokenAsync(
             Windows.Foundation.Uri tokenEndpoint,
             TokenRequestParams params);
+
+        // Initiates an access token request as described by RFC 6749 section 3.2.
+        static Windows.Foundation.IAsyncOperation<TokenRequestResult> RequestTokenAsync(
+            Windows.Foundation.Uri tokenEndpoint,
+            TokenRequestParams params,
+            ClientAuthentication clientAuth);
     }
 
     // Correlates to the 'code_challenge_method' as described by section 4.3 of RFC 7636: Proof Key for Code Exchange by
@@ -222,8 +245,6 @@ namespace Microsoft.Security.Authentication.OAuth
 
     runtimeclass TokenRequestParams
     {
-        // TODO: Client authorization!!!
-
         // Construct with required parameters
         TokenRequestParams(String grantType);
 
@@ -285,7 +306,8 @@ namespace Microsoft.Security.Authentication.OAuth
         String CodeVerifier { get; set; };
 
         // Specifies the "client_id" parameter of the token request. This property is required when the grant type is
-        // "authorization_code" and TODO
+        // "authorization_code" and no alternative client authentication is specified. This property is initiated by
+        // 'CreateForAuthorizationCodeRequest'.
         //
         // Defined by RFC 6749: The OAuth 2.0 Authorization Framework, section 4.1.3
         //      https://www.rfc-editor.org/rfc/rfc6749#section-4.1.3
